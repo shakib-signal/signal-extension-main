@@ -1,0 +1,25 @@
+query RunInput {
+  cart {
+    lines {
+      id
+      quantity
+      attribute(key: "__si_exp") {
+        value
+      }
+      cost {
+        amountPerQuantity {
+          amount
+        }
+      }
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+          product {
+            id
+          }
+        }
+      }
+    }
+  }
+}

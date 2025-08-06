@@ -1,0 +1,38 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "5a195fa302c263a070941a2f744170b6"
+application_url = "https://api.testsignal.com/app"
+embedded = false
+name = "TestSignal A/B Price & Testing"
+handle = "signal-5"
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  uri = "https://api.testsignal.com/webhooks/customers-data-request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://api.testsignal.com/webhooks/customers-redirect"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://api.testsignal.com/webhooks/shop-redirect"
+  compliance_topics = [ "shop/redact" ]
+
+[auth]
+redirect_urls = [
+  "https://api.testsignal.com/",
+  "https://api.testsignal.com/app",
+  "https://api.testsignal.com/redirect",
+  "https://api.testsignal.com/webhooks/app-uninstalled",
+  "https://api.testsignal.com/webhooks/orders-create",
+  "https://public-api.testsignal.com/webhooks/orders-create"
+]
+
+[pos]
+embedded = false

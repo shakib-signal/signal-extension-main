@@ -1,0 +1,17 @@
+query RunInput {
+  cart {
+    lines {
+      id
+      attribute(key: "__si_d") {
+        value
+      }
+      quantity
+      merchandise {
+        __typename
+        ... on ProductVariant {
+          id
+        }
+      }
+    }
+  }
+}

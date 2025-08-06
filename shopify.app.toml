@@ -1,0 +1,41 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "81c618168eb0494d432422f419fa945d"
+application_url = "https://shakib.share.zrok.io/app"
+embedded = false
+name = "test-signal-dev"
+handle = "test-signal-dev"
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-01"
+
+  [[webhooks.subscriptions]]
+  uri = "https://shakib.share.zrok.io/webhooks/customers-data-request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://shakib.share.zrok.io/webhooks/customers-redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "https://shakib.share.zrok.io/webhooks/shop-redact"
+  compliance_topics = [ "shop/redact" ]
+
+[auth]
+redirect_urls = [
+  "https://shakib.share.zrok.io/",
+  "https://shakib.share.zrok.io/app",
+  "https://shakib.share.zrok.io/redirect",
+  "https://shakib.share.zrok.io/webhooks/app-uninstalled",
+  "https://shakib.share.zrok.io/webhooks/orders-create"
+]
+
+[pos]
+embedded = false
+
+[extensions.web_pixel]
+handle = "test-drive-pixel"
+type = "web_pixel"
