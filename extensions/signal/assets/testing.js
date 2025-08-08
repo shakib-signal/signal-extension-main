@@ -48,7 +48,29 @@ async function storeSelectorsForPrice() {
   }
 }
 // image selector
-
+const earlyStyle = document.createElement('style')
+earlyStyle.innerHTML = `
+  .signal-hide-price {
+    visibility: hidden !important;
+  }
+  .signal-hide-body {
+    visibility: hidden !important;
+  }
+  .signal-hide-container {
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+`
+document.head.appendChild(earlyStyle)
+window.signalSettings = {
+  hideBody: false
+}
+if (window?.signalSettings?.hideBody) {
+  document.documentElement.classList.add('signal-hide-body')
+  setTimeout(() => {
+    document.documentElement.classList.remove('signal-hide-body')
+  }, 1200) // fallback to unhide after 1.5s
+}
 const sanitizeArray = (arr) =>
   (Array.isArray(arr) ? arr : [arr])
     .filter(Boolean)
@@ -240,6 +262,12 @@ const removeStorage = (experimentId, key) => {
   }
 }
 
+const removeHideBody = () => {
+  if (window?.signalSettings?.hideBody) {
+    document.documentElement.classList.remove('signal-hide-body')
+  }
+}
+
 // store experiment data
 
 function storeExperimentData(experiments, products, utmParams) {
@@ -357,6 +385,48 @@ function splitSelectors(selectorArray) {
   })
 }
 
+function hidePriceElements(priceElements) {
+  if (!priceElements) return
+  ;['compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+
+    // If it's a NodeList or Array, loop through
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach((el) => {
+        el.classList.add('signal-hide-price')
+      })
+    } else if (value instanceof Element) {
+      // It's a single DOM element (e.g., container)
+      value.classList.add('signal-hide-price')
+    }
+  })
+}
+
+// Utility to reveal specific price elements
+function revealPriceElements(priceElements) {
+  if (!priceElements) return
+  ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach((el) => {
+        el.classList.remove('signal-hide-price')
+      })
+    } else if (value instanceof Element) {
+      value.classList.remove('signal-hide-price')
+    }
+  })
+}
+
+function revealAllHiddenClasses() {
+  const hiddenClasses = document.querySelectorAll('.signal-hide-price')
+  hiddenClasses.forEach((container) => {
+    container.classList.remove('signal-hide-price')
+  })
+}
+
 // fetching selectors data
 
 async function fetchStoreClassSelector() {
@@ -364,11 +434,9 @@ async function fetchStoreClassSelector() {
   const themeId = themeInfo.id
   const themeName = themeInfo.schema_name
   const shop = window.Shopify.shop
-  console.log('themeId from testing js', themeId)
 
   if (!themeId) {
-    console.log('themeId not found')
-    return
+    return {}
   }
 
   try {
@@ -377,29 +445,34 @@ async function fetchStoreClassSelector() {
       // `http://localhost:5001/api/v1/app/selector/${themeId}`
     )
     const result = await response.json()
-    console.log('result', result)
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to fetch selector')
     }
 
     if (result.data) {
-      const { themeName, selectors } = result.data
-
-      return selectors
+      const { themeName, selectors: fetchedSelectors } = result.data
+      return fetchedSelectors || {}
     }
   } catch (error) {
     console.error(error)
   }
+
+  return {}
 }
+
+// Initialize selectors immediately
+;(async function initializeSelectors() {
+  selectors = await fetchStoreClassSelector()
+})()
 
 // started code
 
 document.addEventListener('DOMContentLoaded', async () => {
-  selectors = (await fetchStoreClassSelector()) || {}
-
-  console.log('selectors', selectors)
-  console.log('possibleSelectors', possibleSelectors)
+  // Wait for selectors to be initialized if not already done
+  if (!selectors || Object.keys(selectors).length === 0) {
+    selectors = await fetchStoreClassSelector()
+  }
 
   searchInput = splitSelectors(selectors?.searchClassOrId)
 
@@ -733,67 +806,109 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Fallback: If no input was passed or input didn't contain variant ID, look for a variant selector in the product form
     return getIdFromCartForm()
   }
+  const variantHandler = (event) => {
+    const productContainer = document.querySelector(
+      possibleSelectors.singleProductContainer.join(',')
+    )
+    if (productContainer) {
+      const priceElements = findPriceElements(productContainer)
+      hidePriceElements(priceElements)
+    }
 
+    try {
+      const variantInput = event.target.closest(
+        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
+      )
+
+      // Update prices after a short delay to allow variant changes to complete
+      setTimeout(() => {
+        try {
+          if (variantInput) {
+            const variantId = getVariantId(variantInput)
+            updateSingleProductPrice(variantId)
+            waitForProductPriceAndRun()
+          } else {
+            const variantId = getIdFromCartForm(event)
+            updateSingleProductPrice(variantId)
+            waitForProductPriceAndRun()
+          }
+        } catch (error) {
+          console.error('Error updating prices:', error)
+        }
+      }, 600)
+    } catch (error) {
+      console.error('Error in variant change handler:', error)
+    }
+  }
+  document.addEventListener('change', variantHandler)
   function watchVariantChanges() {
     console.log('Setting up variant change listeners')
-
-    // Listen for variant changes on the main product
-    document.addEventListener('change', (event) => {
-      try {
-        const variantInput = event.target.closest(
-          'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
-        )
-
-        // Update prices after a short delay to allow variant changes to complete
-        setTimeout(() => {
-          try {
-            if (variantInput) {
-              const variantId = getVariantId(variantInput)
-              updateSingleProductPrice(variantId)
-              waitForProductPriceAndRun()
-            } else {
-              const variantId = getIdFromCartForm(event)
-              updateSingleProductPrice(variantId)
-              waitForProductPriceAndRun()
-            }
-          } catch (error) {
-            console.error('Error updating prices:', error)
-          }
-        }, 600)
-      } catch (error) {
-        console.error('Error in variant change handler:', error)
-      }
-    })
-
-    // Listen for Shopify's variant:change event
-    document.addEventListener('variant:change', () => {
-      try {
-        setTimeout(() => {
-          try {
-            const variantId = getVariantId()
-            updateSingleProductPrice(variantId)
-          } catch (error) {
-            console.error('Error updating prices:', error)
-          }
-        }, 600)
-      } catch (error) {
-        console.error('Error in Shopify variant change handler:', error)
-      }
-    })
-
-    // Handle initial variant from URL
-    // const urlParams = new URLSearchParams(window.location.search)
-    // const variantFromURL = window.location.search.split('variant=')[1]
-    // if (variantFromURL) {
-    //   setTimeout(() => {
-    //     try {
-    //       console.log('variantFromURL', variantFromURL)
-    //       updateSingleProductPrice(variantFromURL)
-    //     } catch (error) {
-    //       console.error('Error updating prices for initial variant:', error)
-    //     }
-    //   }, 2600)
+    // const productContainer = document.querySelector(
+    //   possibleSelectors.singleProductContainer.join(',')
+    // )
+    // console.log('productContainer', productContainer)
+    // if (productContainer) {
+    //   const priceElements = findPriceElements(productContainer)
+    //   hidePriceElements(priceElements)
     // }
+
+    // // Listen for variant changes on the main product
+    // document.addEventListener('change', (event) => {
+    //   try {
+    //     const variantInput = event.target.closest(
+    //       'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
+    //     )
+
+    //     // Update prices after a short delay to allow variant changes to complete
+    //     setTimeout(() => {
+    //       try {
+    //         if (variantInput) {
+    //           const variantId = getVariantId(variantInput)
+    //           updateSingleProductPrice(variantId)
+    //           waitForProductPriceAndRun()
+    //         } else {
+    //           const variantId = getIdFromCartForm(event)
+    //           updateSingleProductPrice(variantId)
+    //           waitForProductPriceAndRun()
+    //         }
+    //       } catch (error) {
+    //         console.error('Error updating prices:', error)
+    //       }
+    //     }, 600)
+    //   } catch (error) {
+    //     console.error('Error in variant change handler:', error)
+    //   }
+    // })
+
+    // // Listen for Shopify's variant:change event
+    // // document.addEventListener('variant:change', () => {
+    // //   try {
+    // //     setTimeout(() => {
+    // //       try {
+    // //         const variantId = getVariantId()
+    // //         updateSingleProductPrice(variantId)
+    // //       } catch (error) {
+    // //         console.error('Error updating prices:', error)
+    // //       }
+    // //     }, 600)
+    // //   } catch (error) {
+    // //     console.error('Error in Shopify variant change handler:', error)
+    // //   }
+    // // })
+
+    // // Handle initial variant from URL
+    // // const urlParams = new URLSearchParams(window.location.search)
+    // // const variantFromURL = window.location.search.split('variant=')[1]
+    // // if (variantFromURL) {
+    // //   setTimeout(() => {
+    // //     try {
+    // //       console.log('variantFromURL', variantFromURL)
+    // //       updateSingleProductPrice(variantFromURL)
+    // //     } catch (error) {
+    // //       console.error('Error updating prices for initial variant:', error)
+    // //     }
+    // //   }, 2600)
+    // // }
   }
 
   // update product prices
@@ -939,6 +1054,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     //   // Remove sale class if no sale price
     //   // updateSaleClass(priceElements.container, false)
     // }
+    requestAnimationFrame(() => {
+      revealPriceElements(priceElements)
+    })
   }
 
   // Helper function to update sale class
@@ -951,6 +1069,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
     if (!matchedProduct) {
       console.warn('Active variant not found in products list.')
+      revealAllHiddenClasses()
       return
     }
 
@@ -965,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Find and update price elements
     const priceElements = findPriceElements(productContainer)
+    hidePriceElements(priceElements)
     updatePriceElements(
       priceElements,
       price,
@@ -994,6 +1114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateProductPricesOnCard() {
     if (!products || !products.length) {
       console.warn('No products available.')
+      revealAllHiddenClasses()
       return
     }
     const sortedProducts = sortCatalogProducts()
@@ -1058,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateProductPrices(variantId = null) {
     if (!products || !products.length) {
       console.warn('No products available.')
+      revealAllHiddenClasses()
       return
     }
     if (variantId) {
@@ -2477,8 +2599,126 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   }
 
+  function setupPriceContainerObserver() {
+    let isUpdating = false
+    let updateTimeout = null
+
+    const observer = new MutationObserver((mutations) => {
+      // Skip if we're already in an update cycle
+      if (isUpdating) return
+
+      let hasPriceChanges = false
+      let containersToHide = new Set()
+
+      const priceClasses = [
+        '.price',
+        '.price_inner',
+        '.price-regular-value',
+        '.price-sale-value',
+        '.price__regular',
+        '.price__sale',
+        '.price__badge',
+        '.compare-at-price',
+        's',
+        'del',
+        '.price-item',
+        '.price__container',
+        '.price-compare'
+      ]
+      const containerClasses = [
+        '.price',
+        '.price_inner'
+        // '.product-card',
+        // '.card-wrapper',
+        // '.grid-view-item',
+        // '[id*="price-template"]'
+        // 'product-page',
+        // 'product-card'
+      ]
+
+      mutations.forEach((mutation) => {
+        // Check for removed nodes that are price-related
+        if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+          mutation.removedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const isPriceElement =
+                node.matches &&
+                (node.matches(priceClasses.join(',')) ||
+                  (node.querySelector &&
+                    node.querySelector(priceClasses.join(','))))
+
+              if (isPriceElement) {
+                hasPriceChanges = true
+                const container = node.closest(containerClasses.join(','))
+                if (container) {
+                  containersToHide.add(container)
+                }
+              }
+            }
+          })
+        }
+
+        // Check for added nodes that are price-related
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const isPriceElement =
+                node.matches &&
+                (node.matches(priceClasses.join(',')) ||
+                  (node.querySelector &&
+                    node.querySelector(priceClasses.join(','))))
+
+              if (isPriceElement) {
+                hasPriceChanges = true
+                const container = node.closest(containerClasses.join(','))
+                if (container) {
+                  containersToHide.add(container)
+                }
+              }
+            }
+          })
+        }
+      })
+
+      // If we detected price changes, handle them intelligently
+      if (hasPriceChanges && containersToHide.size > 0) {
+        isUpdating = true
+
+        // Clear any existing timeout
+        if (updateTimeout) {
+          clearTimeout(updateTimeout)
+        }
+
+        // Hide all affected containers
+        containersToHide.forEach((container) => {
+          if (!container.classList.contains('signal-hide-container')) {
+            container.classList.add('signal-hide-container')
+          }
+        })
+
+        // Set a longer timeout to allow for Shopify's DOM replacement cycle
+        updateTimeout = setTimeout(() => {
+          containersToHide.forEach((container) => {
+            container.classList.remove('signal-hide-container')
+          })
+          isUpdating = false
+          updateTimeout = null
+        }, 600) // Increased delay to handle Shopify's DOM replacement
+      }
+    })
+
+    // Start observing the entire document for price container changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    })
+
+    return observer
+  }
+
   // 🏁 **Run once on page load**
 
+  setupPriceContainerObserver()
   waitForUserSession(async () => {
     try {
       await switchTestByUser()
@@ -2489,7 +2729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
   waitForProductPriceAndRun()
   // onVariantUrlChange(updateHydrozenThemePrices)
-  watchVariantChanges()
+  // watchVariantChanges()
   setupSearchAndModalListeners()
 
   // Add click handler for product links
@@ -2574,7 +2814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Update the price display
-        watchVariantChanges()
+        // watchVariantChanges()
       })
     })
 
@@ -2792,7 +3032,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ✅ No experiments? Do nothing — let theme handle it.
     if (experimentString === '') {
       console.warn('No experiment found. Letting theme handle Add to Cart.')
-      return // don’t preventDefault or stopPropagation
+      return // don't preventDefault or stopPropagation
     }
 
     // ✅ Has experiment: override default behavior
