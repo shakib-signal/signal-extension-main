@@ -999,11 +999,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     let comparePriceContainer = priceElements.container
 
     const comparePriceEls = comparePriceContainer.querySelectorAll(
-      `s, del, .compare-at-price, compare-at-price ${
-        possibleSelectors?.compare?.length
-          ? `,${possibleSelectors.compare.join(',')}`
-          : ''
-      }`
+      `s, del, .compare-at-price, compare-at-price, ${possibleSelectors.compare.join(
+        ','
+      )}`
     )
 
     // Update all sale prices
