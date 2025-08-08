@@ -47,30 +47,39 @@ async function storeSelectorsForPrice() {
     badges: [...new Set([...customSelectors.badges])]
   }
 }
-// image selector
 const earlyStyle = document.createElement('style')
 earlyStyle.innerHTML = `
   .signal-hide-price {
     visibility: hidden !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease-in;
   }
   .signal-hide-body {
     visibility: hidden !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease;
   }
   .signal-hide-container {
     visibility: hidden !important;
     opacity: 0 !important;
+    transition: opacity 0.3s ease;
   }
+  .signal-fade-in {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
 `
 document.head.appendChild(earlyStyle)
+// image selector
 window.signalSettings = {
   hideBody: false
 }
-if (window?.signalSettings?.hideBody) {
-  document.documentElement.classList.add('signal-hide-body')
-  setTimeout(() => {
-    document.documentElement.classList.remove('signal-hide-body')
-  }, 1200) // fallback to unhide after 1.5s
-}
+// if (window?.signalSettings?.hideBody) {
+//   document.documentElement.classList.add('signal-hide-body')
+//   setTimeout(() => {
+//     document.documentElement.classList.remove('signal-hide-body')
+//   }, 1200) // fallback to unhide after 1.5s
+// }
 const sanitizeArray = (arr) =>
   (Array.isArray(arr) ? arr : [arr])
     .filter(Boolean)
@@ -404,7 +413,7 @@ function hidePriceElements(priceElements) {
 }
 
 // Utility to reveal specific price elements
-function revealPriceElements(priceElements) {
+function revealPriceElementsX(priceElements) {
   if (!priceElements) return
   ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -419,11 +428,51 @@ function revealPriceElements(priceElements) {
     }
   })
 }
+function revealPriceElements(priceElements) {
+  if (!priceElements) return
+  ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+
+    const reveal = (el) => {
+      // Step 1: Add fade-in class (which makes it visible + opacity 1)
+      el.classList.add('signal-fade-in')
+
+      // Step 2: Wait for transition, then remove the hidden class
+      setTimeout(() => {
+        el.classList.remove('signal-hide-price')
+        el.classList.remove('signal-fade-in') // optional, if you want a clean DOM
+      }, 400) // match your transition duration
+    }
+
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach(reveal)
+    } else if (value instanceof Element) {
+      reveal(value)
+    }
+  })
+}
+
+function revelAllHiddenPrices() {
+  const elements = document.querySelectorAll(
+    (price_container_selectors || ['.price']).join(',')
+  )
+  elements.forEach((el) => {
+    el.setAttribute(
+      'style',
+      'visibility: visible!important; opacity: 1!important; transition: opacity 0.3s ease-in-out;'
+    )
+  })
+}
 
 function revealAllHiddenClasses() {
   const hiddenClasses = document.querySelectorAll('.signal-hide-price')
   hiddenClasses.forEach((container) => {
-    container.classList.remove('signal-hide-price')
+    container.classList.add('signal-fade-in')
+    setTimeout(() => {
+      container.classList.remove('signal-hide-price')
+      container.classList.remove('signal-fade-in')
+    }, 400)
   })
 }
 
@@ -999,9 +1048,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     let comparePriceContainer = priceElements.container
 
     const comparePriceEls = comparePriceContainer.querySelectorAll(
-      `s, del, .compare-at-price, compare-at-price, ${possibleSelectors.compare.join(
-        ','
-      )}`
+      `s, del, .compare-at-price, compare-at-price ${
+        possibleSelectors?.compare?.length
+          ? `,${possibleSelectors.compare.join(',')}`
+          : ''
+      }`
     )
 
     // Update all sale prices
@@ -2718,7 +2769,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 🏁 **Run once on page load**
 
-  setupPriceContainerObserver()
   waitForUserSession(async () => {
     try {
       await switchTestByUser()
@@ -2727,6 +2777,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error(e)
     }
   })
+  setupPriceContainerObserver()
+  setTimeout(() => {
+    revelAllHiddenPrices()
+  }, 600)
   waitForProductPriceAndRun()
   // onVariantUrlChange(updateHydrozenThemePrices)
   // watchVariantChanges()

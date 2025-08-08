@@ -27,6 +27,15 @@
   const predictive_search_image_selectors = '{{ block.settings.predictive_search_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
 
 </script>
+{% if block.settings.price_container_selector %}
+  <style>
+    {{ block.settings.price_container_selector }} {
+      visibility: hidden !important;
+      opacity: 0 !important;
+      transition: opacity 0.3s ease;
+    }
+  </style>
+{% endif %}
 
 {% comment %} <script defer src="{{ 'signals-price-test.js' | asset_url }}"></script> {% endcomment %}
 <script defer src="{{ 'testing.js' | asset_url }}"></script>
