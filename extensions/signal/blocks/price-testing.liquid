@@ -5,7 +5,7 @@
   const shop = '{{ shop.permanent_domain }}';
   const firstVariant_product = '{{ product.variants.first.id }}';
   const signalMoneyFormat = window.money_format || "{{ shop.money_format }}"
-  const price_container_selectors = '{{ block.settings.price_container_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
+  const flicker_container_selectors = '{{ block.settings.flicker_container_selectors }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
 
   {% comment %} const product_card_selectors = '{{ block.settings.product_card_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
   const single_product_selectors = '{{ block.settings.single_product_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
@@ -28,9 +28,9 @@
   const predictive_search_image_selectors = '{{ block.settings.predictive_search_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean); {% endcomment %}
 
 </script>
-{% if block.settings.price_container_selector %}
+{% if block.settings.flicker_container_selectors %}
   <style>
-    {{ block.settings.price_container_selector }} {
+    {{ block.settings.flicker_container_selectors }} {
       visibility: hidden !important;
       opacity: 0 !important;
       transition: opacity 0.3s ease;
@@ -52,7 +52,7 @@
   "settings": [   
     {
       "type": "text",
-      "id": "price_container_selector",
+      "id": "flicker_container_selectors",
       "label": "Flicker Container Selector",
       "default": ".price__pricing-group, .price, .price__container, ",
       "info": "Comma(,) Separated value for multiple class selectors"
