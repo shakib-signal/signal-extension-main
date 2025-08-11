@@ -22,8 +22,7 @@ productContainerTest = [
   ...(selectors?.productContainer || []),
   ...(selectors?.triggerElementContainer || [])
 ]
-
-async(function storeSelectorsForPrice() {
+;(function storeSelectorsForPrice() {
   customSelectors = {
     productCardContainer: productContainerTest || [],
     singleProductContainer: selectors?.singleProductContainer || [],
