@@ -1,61 +1,108 @@
 let products = []
-
+let searchInput = []
+let modalTrigger = []
+let productContainerTest = []
+let possibleSelectors = {}
+let customSelectors = {}
+const current_themeId = window.Shopify.theme.id.toString()
+const current_themeName = window.Shopify.theme.schema_name
+const current_shop = window.Shopify.shop
 // Get custom selectors from theme settings
-const customSelectors = {
-  productCardContainer: Array.isArray(product_card_selectors)
-    ? product_card_selectors
-    : [product_card_selectors],
-  singleProductContainer: Array.isArray(single_product_selectors)
-    ? single_product_selectors
-    : [single_product_selectors],
-  searchInputSelector: Array.isArray(search_input_selectors)
-    ? search_input_selectors
-    : [search_input_selectors],
-  modalTriggerSelector: Array.isArray(modal_trigger_selectors)
-    ? modal_trigger_selectors
-    : [modal_trigger_selectors],
-  priceContainer: Array.isArray(price_container_selectors)
-    ? price_container_selectors
-    : [price_container_selectors],
-  compare: Array.isArray(price_compare_selectors)
-    ? price_compare_selectors
-    : [price_compare_selectors],
-  sale: Array.isArray(price_sale_selectors)
-    ? price_sale_selectors
-    : [price_sale_selectors],
-  badges: ['.badge', '.price__badge']
-}
+const all_selectors = JSON.parse(selectors_data)
+const selectors = all_selectors?.find(
+  (selector) => selector.themeId == current_themeId
+)?.selectors
+searchInput = splitSelectors(selectors?.searchClassOrId)
 
-// Merge default and custom selectors
-const possibleSelectors = {
-  productCardContainer: [
-    ...new Set([
-      ...customSelectors.productCardContainer
-      // ...defaultSelectors.productContainer
-    ])
-  ],
-  singleProductContainer: [
-    ...new Set([
-      ...customSelectors.singleProductContainer
-      // ...defaultSelectors.productContainer
-    ])
-  ],
-  priceContainer: [
-    ...new Set([
-      ...customSelectors.priceContainer
-      // ...defaultSelectors.priceContainer
-    ])
-  ],
-  compare: [
-    ...new Set([...customSelectors.compare])
-    // ...defaultSelectors.regular
-  ],
-  sale: [...new Set([...customSelectors.sale])],
-  badges: [...new Set([...customSelectors.badges])]
-}
+const modalContent = splitSelectors(selectors?.modalClassOrId ?? [])
+const modalButton = splitSelectors(selectors?.triggerButtonClassOrId ?? [])
 
+if (modalContent || modalButton) {
+  modalTrigger = [...modalContent, ...modalButton]
+}
+productContainerTest = [
+  ...(selectors?.productContainer || []),
+  ...(selectors?.triggerElementContainer || [])
+]
+;(function storeSelectorsForPrice() {
+  customSelectors = {
+    productCardContainer: productContainerTest || [],
+    singleProductContainer: selectors?.singleProductContainer || [],
+    searchInputSelector: searchInput || [],
+    modalTriggerSelector: modalTrigger || [],
+    priceContainer: selectors?.priceContainer || [],
+    compare: selectors?.comparePriceClassOrId || [],
+    sale: selectors?.salePriceClassOrId || [],
+    badges: ['.badge', '.price__badge']
+  }
+
+  // Merge default and custom selectors
+  possibleSelectors = {
+    productCardContainer: [
+      ...new Set([
+        ...customSelectors.productCardContainer
+        // ...defaultSelectors.productContainer
+      ])
+    ],
+    singleProductContainer: [
+      ...new Set([
+        ...customSelectors.singleProductContainer
+        // ...defaultSelectors.productContainer
+      ])
+    ],
+    priceContainer: [
+      ...new Set([
+        ...customSelectors.priceContainer
+        // ...defaultSelectors.priceContainer
+      ])
+    ],
+    compare: [
+      ...new Set([...customSelectors.compare])
+      // ...defaultSelectors.regular
+    ],
+    sale: [...new Set([...customSelectors.sale])],
+    badges: [...new Set([...customSelectors.badges])]
+  }
+})()
+const earlyStyle = document.createElement('style')
+earlyStyle.innerHTML = `
+  .signal-hide-price {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease-out;
+  }
+  .signal-hide-body {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease;
+  }
+  .signal-hide-container {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease;
+  }
+  .signal-fade-in {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+`
+document.head.appendChild(earlyStyle)
 // image selector
-
+window.signalSettings = {
+  hideBody: false,
+  showConsoleLog: false
+}
+const consoleLog = (content) => {
+  if (window?.signalSettings?.showConsoleLog) {
+    console.log(content)
+  }
+}
+// if (window?.signalSettings?.hideBody) {
+//   document.documentElement.classList.add('signal-hide-body')
+//   setTimeout(() => {
+//     document.documentElement.classList.remove('signal-hide-body')
+//   }, 1200) // fallback to unhide after 1.5s
+// }
 const sanitizeArray = (arr) =>
   (Array.isArray(arr) ? arr : [arr])
     .filter(Boolean)
@@ -247,6 +294,12 @@ const removeStorage = (experimentId, key) => {
   }
 }
 
+const removeHideBody = () => {
+  if (window?.signalSettings?.hideBody) {
+    document.documentElement.classList.remove('signal-hide-body')
+  }
+}
+
 // store experiment data
 
 function storeExperimentData(experiments, products, utmParams) {
@@ -348,9 +401,131 @@ function formatedPriceWithCurrency(cents) {
   }
 }
 
+// spliting classes
+function splitSelectors(selectorArray) {
+  return selectorArray?.flatMap((selector) => {
+    const prefix = selector[0] // '.' or '#'
+    const rest = selector.slice(1) // remove first character
+
+    const parts = rest.split('.') // split by dot
+    return parts.map((part, index) => {
+      // First part keeps the original prefix (either . or #)
+      // Remaining parts are class names → prefixed with '.'
+      if (index === 0) return prefix + part
+      return '.' + part
+    })
+  })
+}
+
+function hidePriceElements(priceElements) {
+  if (!priceElements) return
+  ;['compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+
+    // If it's a NodeList or Array, loop through
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach((el) => {
+        el.classList.add('signal-hide-price')
+      })
+    } else if (value instanceof Element) {
+      // It's a single DOM element (e.g., container)
+      value.classList.add('signal-hide-price')
+    }
+  })
+}
+
+// Utility to reveal specific price elements
+function revealPriceElements(priceElements) {
+  if (!priceElements) return
+  ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+
+    const reveal = (el) => {
+      // Step 1: Add fade-in class (which makes it visible + opacity 1)
+      el.classList.add('signal-fade-in')
+
+      // Step 2: Wait for transition, then remove the hidden class
+      setTimeout(() => {
+        el.classList.remove('signal-hide-price')
+        el.classList.remove('signal-fade-in') // optional, if you want a clean DOM
+      }, 400) // match your transition duration
+    }
+
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach(reveal)
+    } else if (value instanceof Element) {
+      reveal(value)
+    }
+  })
+}
+
+function revelAllHiddenPrices() {
+  const elements = document.querySelectorAll(
+    (price_container_selectors || ['.price']).join(',')
+  )
+  elements.forEach((el) => {
+    el.setAttribute(
+      'style',
+      'visibility: visible!important; opacity: 1!important; transition: opacity 0.3s ease-in-out;'
+    )
+  })
+}
+
+function revealAllHiddenClasses() {
+  const hiddenClasses = document.querySelectorAll('.signal-hide-price')
+  hiddenClasses.forEach((container) => {
+    container.classList.add('signal-fade-in')
+    setTimeout(() => {
+      container.classList.remove('signal-hide-price')
+      container.classList.remove('signal-fade-in')
+    }, 400)
+  })
+}
+
+// fetching selectors data
+
+// async function fetchStoreClassSelector() {
+//   const themeInfo = window.Shopify.theme
+//   const themeId = themeInfo.id
+//   const themeName = themeInfo.schema_name
+//   const shop = window.Shopify.shop
+
+//   if (!themeId) {
+//     return {}
+//   }
+
+//   try {
+//     const response = await fetch(
+//       `https://api.testsignal.com/api/v1/app/selector/${themeId}?shop=${shop}`
+//       // `http://localhost:5001/api/v1/app/selector/${themeId}`
+//     )
+//     const result = await response.json()
+
+//     if (!response.ok) {
+//       throw new Error(result.message || 'Failed to fetch selector')
+//     }
+
+//     if (result.data) {
+//       const { themeName, selectors: fetchedSelectors } = result.data
+//       return fetchedSelectors || {}
+//     }
+//   } catch (error) {
+//     console.error(error)
+//   }
+
+//   return {}
+// }
+
+// // Initialize selectors immediately
+// ;(async function initializeSelectors() {
+//   selectors = await fetchStoreClassSelector()
+// })()
+
 // started code
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const applyTestPrices = (experiment, activeTestId) => {
     const activeTest = getStorage(experiment.id, 'active_ts') || activeTestId
 
@@ -395,7 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // search and modal listeners
   function setupSearchAndModalListeners() {
-    console.log('Setting up search and modal listeners')
+    consoleLog('Setting up search and modal listeners')
 
     // Listen for search input changes
     document.addEventListener('input', (event) => {
@@ -403,9 +578,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchInput = event.target.closest(
           `${
             customSelectors.searchInputSelector.length > 0
-              ? customSelectors.searchInputSelector.join(',')
+              ? `${customSelectors.searchInputSelector.join(',')},`
               : ''
-          }, input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+          } input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
         )
         if (!searchInput) return
         // Update prices after a short delay to allow search results to load
@@ -427,9 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchForm = event.target.closest(
           `${
             customSelectors.searchInputSelector.length > 0
-              ? customSelectors.searchInputSelector.join(',')
+              ? `${customSelectors.searchInputSelector.join(',')},`
               : ''
-          }, form[action*="query"]`
+          } form[action*="query"]`
         )
         if (!searchForm) return
 
@@ -452,9 +627,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchResult = event.target.closest(
           `${
             customSelectors.searchInputSelector.length > 0
-              ? customSelectors.searchInputSelector.join(',')
+              ? `${customSelectors.searchInputSelector.join(',')},`
               : ''
-          }, .search-result-item, [data-search-result]`
+          } input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
         )
         if (!searchResult) return
 
@@ -477,9 +652,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const modalTrigger = event.target.closest(
           `${
             customSelectors.modalTriggerSelector.length > 0
-              ? customSelectors.modalTriggerSelector.join(',')
+              ? `${customSelectors.modalTriggerSelector.join(',')},`
               : ''
-          }, [data-modal-trigger], [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
+          } [data-modal-trigger], [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
         )
         if (!modalTrigger) return
 
@@ -501,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Find the open modal
             const openModal = document.querySelector('quick-add-modal[open]')
             if (openModal) {
-              console.log('Found Open Modal:', openModal)
+              consoleLog('Found Open Modal:', openModal)
 
               // Get the product info from the open modal
               const productInfo = openModal.querySelector('product-info')
@@ -667,71 +842,46 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fallback: If no input was passed or input didn't contain variant ID, look for a variant selector in the product form
     return getIdFromCartForm()
   }
+  const variantHandler = (event) => {
+    const productContainer = document.querySelector(
+      possibleSelectors.singleProductContainer.join(',')
+    )
+    if (productContainer) {
+      const priceElements = findPriceElements(productContainer)
+      hidePriceElements(priceElements)
+    }
 
-  function watchVariantChanges() {
-    console.log('Setting up variant change listeners')
+    try {
+      const variantInput = event.target.closest(
+        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
+      )
 
-    // Listen for variant changes on the main product
-    document.addEventListener('change', (event) => {
-      try {
-        const variantInput = event.target.closest(
-          'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
-        )
-
-        // Update prices after a short delay to allow variant changes to complete
-        setTimeout(() => {
-          try {
-            if (variantInput) {
-              const variantId = getVariantId(variantInput)
-              updateSingleProductPrice(variantId)
-              waitForProductPriceAndRun()
-            } else {
-              const variantId = getIdFromCartForm(event)
-              updateSingleProductPrice(variantId)
-              waitForProductPriceAndRun()
-            }
-          } catch (error) {
-            console.error('Error updating prices:', error)
-          }
-        }, 600)
-      } catch (error) {
-        console.error('Error in variant change handler:', error)
-      }
-    })
-
-    // Listen for Shopify's variant:change event
-    document.addEventListener('variant:change', () => {
-      try {
-        setTimeout(() => {
-          try {
-            const variantId = getVariantId()
-            updateSingleProductPrice(variantId)
-          } catch (error) {
-            console.error('Error updating prices:', error)
-          }
-        }, 600)
-      } catch (error) {
-        console.error('Error in Shopify variant change handler:', error)
-      }
-    })
-
-    // Handle initial variant from URL
-    const urlParams = new URLSearchParams(window.location.search)
-    const variantFromURL = urlParams.get('variant')
-    if (variantFromURL) {
+      // Update prices after a short delay to allow variant changes to complete
       setTimeout(() => {
         try {
-          updateSingleProductPrice(variantFromURL)
+          if (variantInput) {
+            const variantId = getVariantId(variantInput)
+            updateSingleProductPrice(variantId)
+            waitForProductPriceAndRun()
+          } else {
+            const variantId = getIdFromCartForm(event)
+            updateSingleProductPrice(variantId)
+            waitForProductPriceAndRun()
+          }
         } catch (error) {
-          console.error('Error updating prices for initial variant:', error)
+          console.error('Error updating prices:', error)
         }
       }, 600)
+    } catch (error) {
+      console.error('Error in variant change handler:', error)
     }
   }
+  document.addEventListener('change', variantHandler)
 
   // update product prices
 
   const updatePrice = (priceEl, price) => {
+    // console.log('priceEl', price)
     if (!priceEl) return null
 
     const priceText = formatedPriceWithCurrency(parseFloat(price) * 100)
@@ -771,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
     discountPercentage
   ) {
     if (!priceElements.container) {
-      console.log('No price container found')
+      consoleLog('No price container found')
       return
     }
 
@@ -816,9 +966,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let comparePriceContainer = priceElements.container
 
     const comparePriceEls = comparePriceContainer.querySelectorAll(
-      `s, del, .compare-at-price, compare-at-price, ${possibleSelectors.compare.join(
-        ','
-      )}`
+      `s, del, .compare-at-price, compare-at-price ${
+        possibleSelectors?.compare?.length
+          ? `,${possibleSelectors.compare.join(',')}`
+          : ''
+      }`
     )
 
     // Update all sale prices
@@ -871,6 +1023,9 @@ document.addEventListener('DOMContentLoaded', () => {
     //   // Remove sale class if no sale price
     //   // updateSaleClass(priceElements.container, false)
     // }
+    requestAnimationFrame(() => {
+      revealPriceElements(priceElements)
+    })
   }
 
   // Helper function to update sale class
@@ -883,11 +1038,13 @@ document.addEventListener('DOMContentLoaded', () => {
       })
     if (!matchedProduct) {
       console.warn('Active variant not found in products list.')
+      revealAllHiddenClasses()
       return
     }
 
     const { price, compareAtPrice, discountAmount, discountPercentage } =
       matchedProduct
+    // console.log('singleProduct-container', possibleSelectors.singleProductContainer)
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
     )
@@ -896,6 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Find and update price elements
     const priceElements = findPriceElements(productContainer)
+    hidePriceElements(priceElements)
     updatePriceElements(
       priceElements,
       price,
@@ -925,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateProductPricesOnCard() {
     if (!products || !products.length) {
       console.warn('No products available.')
+      revealAllHiddenClasses()
       return
     }
     const sortedProducts = sortCatalogProducts()
@@ -947,6 +1106,13 @@ document.addEventListener('DOMContentLoaded', () => {
           // )
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
+            if (
+              !selector ||
+              typeof selector !== 'string' ||
+              selector.trim() === ''
+            ) {
+              continue // skip null, undefined, or empty strings
+            }
             let container =
               anchor.closest(selector) ||
               anchor.parentElement?.closest(selector)
@@ -982,6 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateProductPrices(variantId = null) {
     if (!products || !products.length) {
       console.warn('No products available.')
+      revealAllHiddenClasses()
       return
     }
     if (variantId) {
@@ -991,7 +1158,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const getVariantIdFromUrl =
         window.location.search.split('variant=')[1] || null
       let variantId = getVariantIdFromUrl ?? firstVariant_product
-
       updateSingleProductPrice(variantId)
     } else {
       updateProductPricesOnCard()
@@ -1184,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // }, 300);
     const target = document.querySelector('product-price')
     if (target) {
-      console.log('[DEBUG] product-price found, running price override')
+      consoleLog('[DEBUG] product-price found, running price override')
       // clearInterval(waitInterval);
 
       if (document.readyState === 'loading') {
@@ -1339,10 +1505,12 @@ document.addEventListener('DOMContentLoaded', () => {
   async function switchTestByUser() {
     const now = Date.now()
     let experiments = JSON.parse(signal_rules) || []
+    consoleLog('experiments', experiments)
+
     let experimentFound = false
     if (experiments?.length == 0) {
       localStorage.removeItem('signal_active_experiments')
-      console.log(
+      consoleLog(
         '%cNo active experiment found. Resetting prices.',
         'color: red;'
       )
@@ -1367,14 +1535,14 @@ document.addEventListener('DOMContentLoaded', () => {
         products.push(...newProducts)
         updateProductPrices()
       }
-      const truthy = endDate
+      const trouthy = endDate
         ? now >= startDate && now <= endDate
         : now >= startDate
 
-      if (truthy) {
+      if (trouthy) {
         experimentFound = true
         if (!isUTMAllowed(experiment)) {
-          console.log(
+          consoleLog(
             '%cUTM rule disabled this test. Skipping...',
             'color: gray;'
           )
@@ -1453,7 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }, resetTime)
         }
       } else {
-        console.log('Experiment ended')
+        consoleLog('Experiment ended')
         ignoreTest()
       }
     }
@@ -1735,12 +1903,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ? 1
             : 0
 
-          console.log(
+          consoleLog(
             `✅ Updated ${updatedCount} images on details page for product ${productId}`
           )
         }
       }
-      console.log(productContainer, 'not found')
+      consoleLog(productContainer, 'not found')
     }
   }
 
@@ -1843,7 +2011,7 @@ document.addEventListener('DOMContentLoaded', () => {
               if (imgEl.hasAttribute('data_max_resolution')) {
                 imgEl.setAttribute('data_max_resolution', imageUrl)
               }
-              console.log(`✅ Updated slideshow image for product ${productId}`)
+              consoleLog(`✅ Updated slideshow image for product ${productId}`)
             } else {
               // Create new image if none exists
               const newImg = document.createElement('img')
@@ -1853,7 +2021,7 @@ document.addEventListener('DOMContentLoaded', () => {
               newImg.className = 'product-media__image'
               newImg.loading = 'lazy'
               activeSlide.appendChild(newImg)
-              console.log(
+              consoleLog(
                 `✅ Created new slideshow image for product ${productId}`
               )
             }
@@ -1875,7 +2043,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (titlePlaceholder) {
               titlePlaceholder.style.display = 'none'
             }
-            console.log(`✅ Updated grid image for product ${productId}`)
+            consoleLog(`✅ Updated grid image for product ${productId}`)
           } else {
             // Create new image if none exists
             const newImg = document.createElement('img')
@@ -1893,7 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             gallery.appendChild(newImg)
-            console.log(`✅ Created new grid image for product ${productId}`)
+            consoleLog(`✅ Created new grid image for product ${productId}`)
           }
         }
       } catch (err) {
@@ -2026,7 +2194,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Ensure both modal structure and product exist (avoids false triggers on old theme)
         if (modalContent && productCard) {
-          console.log('✅ New Theme Predictive Search Triggered')
+          consoleLog('✅ New Theme Predictive Search Triggered')
           updateImageOnNewThemeSearch(productId, imageUrl)
           didUpdate = true
         }
@@ -2044,7 +2212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Only trigger if wrapper and product exist, meaning it's new theme
         if (hasNewThemeWrapper && productNodes.length) {
-          console.log('✅ Enhanced Predictive Search (New Theme) Triggered')
+          consoleLog('✅ Enhanced Predictive Search (New Theme) Triggered')
           updateImageOnNewThemeSearch(productId, imageUrl)
           didUpdate = true
         }
@@ -2385,7 +2553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : null
 
       if (!productHandle || currentHandle !== productHandle) {
-        console.log(
+        consoleLog(
           `Skipping modal update: current handle (${currentHandle}) vs productHandle (${productHandle})`
         )
         return
@@ -2396,8 +2564,125 @@ document.addEventListener('DOMContentLoaded', () => {
         ? testImageUrl
         : modalImg.dataset.originalSrcset
 
-      console.log(`✅ Modal image updated for productHandle=${productHandle}`)
+      consoleLog(`✅ Modal image updated for productHandle=${productHandle}`)
     })
+  }
+
+  function setupPriceContainerObserver() {
+    let isUpdating = false
+    let updateTimeout = null
+
+    const observer = new MutationObserver((mutations) => {
+      // Skip if we're already in an update cycle
+      if (isUpdating) return
+
+      let hasPriceChanges = false
+      let containersToHide = new Set()
+
+      const priceClasses = [
+        '.price',
+        '.price_inner',
+        '.price-regular-value',
+        '.price-sale-value',
+        '.price__regular',
+        '.price__sale',
+        '.price__badge',
+        '.compare-at-price',
+        's',
+        'del',
+        '.price-item',
+        '.price__container',
+        '.price-compare'
+      ]
+      const containerClasses = [
+        '.price',
+        '.price_inner'
+        // '.product-card',
+        // '.card-wrapper',
+        // '.grid-view-item',
+        // '[id*="price-template"]'
+        // 'product-page',
+        // 'product-card'
+      ]
+
+      mutations.forEach((mutation) => {
+        // Check for removed nodes that are price-related
+        if (mutation.type === 'childList' && mutation.removedNodes.length > 0) {
+          mutation.removedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const isPriceElement =
+                node.matches &&
+                (node.matches(priceClasses.join(',')) ||
+                  (node.querySelector &&
+                    node.querySelector(priceClasses.join(','))))
+
+              if (isPriceElement) {
+                hasPriceChanges = true
+                const container = node.closest(containerClasses.join(','))
+                if (container) {
+                  containersToHide.add(container)
+                }
+              }
+            }
+          })
+        }
+
+        // Check for added nodes that are price-related
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const isPriceElement =
+                node.matches &&
+                (node.matches(priceClasses.join(',')) ||
+                  (node.querySelector &&
+                    node.querySelector(priceClasses.join(','))))
+
+              if (isPriceElement) {
+                hasPriceChanges = true
+                const container = node.closest(containerClasses.join(','))
+                if (container) {
+                  containersToHide.add(container)
+                }
+              }
+            }
+          })
+        }
+      })
+
+      // If we detected price changes, handle them intelligently
+      if (hasPriceChanges && containersToHide.size > 0) {
+        isUpdating = true
+
+        // Clear any existing timeout
+        if (updateTimeout) {
+          clearTimeout(updateTimeout)
+        }
+
+        // Hide all affected containers
+        containersToHide.forEach((container) => {
+          if (!container.classList.contains('signal-hide-container')) {
+            container.classList.add('signal-hide-container')
+          }
+        })
+
+        // Set a longer timeout to allow for Shopify's DOM replacement cycle
+        updateTimeout = setTimeout(() => {
+          containersToHide.forEach((container) => {
+            container.classList.remove('signal-hide-container')
+          })
+          isUpdating = false
+          updateTimeout = null
+        }, 600) // Increased delay to handle Shopify's DOM replacement
+      }
+    })
+
+    // Start observing the entire document for price container changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    })
+
+    return observer
   }
 
   // 🏁 **Run once on page load**
@@ -2405,13 +2690,17 @@ document.addEventListener('DOMContentLoaded', () => {
   waitForUserSession(async () => {
     try {
       await switchTestByUser()
+      // switchTest()
     } catch (e) {
       console.error(e)
     }
   })
+  setupPriceContainerObserver()
+  setTimeout(() => {
+    revelAllHiddenPrices()
+  }, 600)
   waitForProductPriceAndRun()
-  onVariantUrlChange(updateHydrozenThemePrices)
-  watchVariantChanges()
+  // onVariantUrlChange(updateHydrozenThemePrices)
   setupSearchAndModalListeners()
 
   // Add click handler for product links
@@ -2465,58 +2754,165 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   // Add change event listener for both select elements
-  document
-    .querySelectorAll('select.single-option-selector, select[name="id"]')
-    .forEach((select) => {
-      select.addEventListener('change', (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-
-        const form = select.closest("form[action*='/cart/add']")
-        if (!form) return
-
-        // Get the actual variant ID from the hidden select
-        const variantSelect = form.querySelector('select[name="id"]')
-        if (!variantSelect) return
-
-        const variantId = variantSelect.value
-
-        const product = products?.find((p) => p?.variantId == variantId)
-
-        const price = product?.discountAmount
-        const userSession = JSON.parse(
-          localStorage.getItem('signal_user_session') || 'null'
-        )
-        const userId = userSession?.clientId
-
-        if (!price) {
-          console.warn('No custom price found. Proceeding with default price.')
-
-          return
-        }
-
-        // Update the price display
-        watchVariantChanges()
-      })
-    })
-
-  // Add change event listener for single option selectors
   // document
-  //   .querySelectorAll(
-  //     '.js-product-option-swatch,.single-option-selector,input[name="id"], select[name="id"], [name="id"] [value],input[data-variant-id]'
-  //   )
+  //   .querySelectorAll('select.single-option-selector, select[name="id"]')
   //   .forEach((select) => {
-  //     select.addEventListener('change', () => {
-  //       watchVariantChanges()
+  //     select.addEventListener('change', (event) => {
+  //       event.preventDefault()
+  //       event.stopPropagation()
+
+  //       const form = select.closest("form[action*='/cart/add']")
+  //       if (!form) return
+
+  //       // Get the actual variant ID from the hidden select
+  //       const variantSelect = form.querySelector('select[name="id"]')
+  //       if (!variantSelect) return
+
+  //       const variantId = variantSelect.value
+
+  //       const product = products?.find((p) => p?.variantId == variantId)
+
+  //       const price = product?.discountAmount
+  //       const userSession = JSON.parse(
+  //         localStorage.getItem('signal_user_session') || 'null'
+  //       )
+  //       const userId = userSession?.clientId
+
+  //       if (!price) {
+  //         console.warn('No custom price found. Proceeding with default price.')
+
+  //         return
+  //       }
+
+  //       // Update the price display
   //     })
   //   })
 
-  // // Handle Shopify's variant:change event
-  // document.addEventListener('variant:change', () => {
-  //   watchVariantChanges()
-  // })
-
   // Function to handle add to cart with custom price
+  // function handleAddToCartX(event, form) {
+  //   event.preventDefault()
+  //   event.stopPropagation()
+
+  //   const variantSelect = form.querySelector(
+  //     'input[name="id"],select[name="id"]'
+  //   )
+  //   if (!variantSelect) return
+
+  //   const variantId = variantSelect.value
+  //   const formData = new FormData(form)
+
+  //   // Get quantity safely, fallback to 1
+  //   const quantityRaw = formData.get('quantity')
+  //   const quantity = quantityRaw ? parseInt(quantityRaw, 10) : 1
+
+  //   const experiments = JSON.parse(
+  //     localStorage.getItem('signal_active_experiments') || 'null'
+  //   )
+  //   const experimentPairs = []
+
+  //   // Theme Test
+  //   const themeExp = experiments?.experiments?.find((e) => e.theme)
+  //   if (themeExp?.theme?.experimentId && themeExp?.theme?.testId) {
+  //     experimentPairs.push(
+  //       `${themeExp.theme.experimentId}_${themeExp.theme.testId}`
+  //     )
+  //   }
+
+  //   // Image Test
+
+  //   const imageTestExp = products
+  //     .filter((p) => p.experimentType === 'image_testing')
+  //     .find((p) => p.variantId === variantId)
+
+  //   if (imageTestExp) {
+  //     experimentPairs.push(
+  //       `${imageTestExp.experimentId}_${imageTestExp.testId}`
+  //     )
+  //   }
+
+  //   // Price Test
+  //   const priceTestExp = products
+  //     .filter((p) => p.experimentType === 'price_testing')
+  //     .find((p) => p.variantId === variantId)
+
+  //   const discountAmount = parseFloat(priceTestExp?.discountAmount).toFixed(2)
+  //   const price = parseFloat(priceTestExp?.price).toFixed(2)
+  //   const experimentId = priceTestExp?.experimentId
+  //   const testId = priceTestExp?.testId
+
+  //   if (experimentId && testId) {
+  //     experimentPairs.push(`${experimentId}_${testId}`)
+  //   }
+
+  //   const userSession = JSON.parse(
+  //     localStorage.getItem('signal_user_session') || 'null'
+  //   )
+  //   const userId = userSession?.clientId
+
+  //   const experimentString = experimentPairs.join(',')
+
+  //   const properties = {
+  //     __si_p: price,
+  //     __si_d: discountAmount,
+  //     __si_ud: userId,
+  //     __si_exp: experimentString
+  //   }
+
+  //   if (experimentString == '') {
+  //     console.warn('No experiment found. Proceeding with default.')
+  //     return
+  //   }
+
+  //   fetch('/cart/add.js', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({
+  //       id: variantId,
+  //       quantity: quantity > 0 ? quantity : 1,
+  //       properties: {
+  //         __si_exp: JSON.stringify(properties)
+  //       }
+  //     })
+  //   })
+  //     .then(async (response) => {
+  //       // Check if cart drawer exists
+  //       const cartDrawer = document.querySelector('cart-drawer')
+
+  //       if (cartDrawer && window.routes && window.routes.cart_url) {
+  //         try {
+  //           // Fetch the updated cart-drawer HTML (this uses the theme's AJAX view)
+  //           const ajaxUrl = `${window.routes.cart_url}?view=ajax`
+  //           const drawerResponse = await fetch(ajaxUrl)
+  //           const updatedDrawerHtml = await drawerResponse.text()
+
+  //           // Update the cart-drawer and open it
+  //           if (cartDrawer.renderContent) {
+  //             // Update the drawer's contents using the component's own render method
+  //             await cartDrawer.renderContent(updatedDrawerHtml)
+  //             // Finally, open the drawer
+  //             cartDrawer.open()
+  //           } else {
+  //             // Fallback if renderContent method doesn't exist
+  //             cartDrawer.innerHTML = updatedDrawerHtml
+  //             cartDrawer.open()
+  //           }
+
+  //           console.log('Variant added and cart drawer refreshed/opened.')
+  //         } catch (error) {
+  //           console.error('Error updating cart drawer:', error)
+  //           // Fallback to cart page if drawer update fails
+  //           window.location.href = '/cart'
+  //         }
+  //       } else {
+  //         // No cart drawer found, redirect to cart page
+  //         window.location.href = '/cart'
+  //       }
+  //     })
+  //     .catch((error) => {
+  //       console.error('Error adding to cart:', error)
+  //       form.submit()
+  //     })
+  // }
 
   async function handleCartDrawerUpdate() {
     const cartDrawer = document.querySelector('cart-drawer')
@@ -2535,7 +2931,7 @@ document.addEventListener('DOMContentLoaded', () => {
           cartDrawer.open()
         }
 
-        console.log('Cart drawer refreshed and opened.')
+        consoleLog('Cart drawer refreshed and opened.')
       } catch (error) {
         console.error('Error updating cart drawer:', error)
         window.location.href = '/cart'
@@ -2605,8 +3001,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ✅ No experiments? Do nothing — let theme handle it.
     if (experimentString === '') {
-      console.warn('No experiment found. Letting theme handle Add to Cart.')
-      return // don’t preventDefault or stopPropagation
+      consoleLog('No experiment found. Letting theme handle Add to Cart.')
+      return // don't preventDefault or stopPropagation
     }
 
     // ✅ Has experiment: override default behavior

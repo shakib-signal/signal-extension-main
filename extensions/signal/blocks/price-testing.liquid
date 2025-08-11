@@ -1,21 +1,21 @@
 <script>
   const signal_rules = '{{ app.metafields.signal_experiments.signal_price_testing_rules.value | json}}'
  	const selectors_data = '{{ app.metafields.signal_selector_data.selectors_by_theme.value | json}}'
-  	const preview_data = '{{ app.metafields.signal_preview.signal_preview_data.value | json}}'
+  const preview_data = '{{ app.metafields.signal_preview.signal_preview_data.value | json}}'
   const shop = '{{ shop.permanent_domain }}';
   const firstVariant_product = '{{ product.variants.first.id }}';
+  const signalMoneyFormat = window.money_format || "{{ shop.money_format }}"
+  const price_container_selectors = '{{ block.settings.price_container_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
 
-  const product_card_selectors = '{{ block.settings.product_card_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
+  {% comment %} const product_card_selectors = '{{ block.settings.product_card_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
   const single_product_selectors = '{{ block.settings.single_product_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
   const search_input_selectors = '{{ block.settings.search_input_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
-  const modal_trigger_selectors = '{{ block.settings.modal_trigger_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
-  const price_container_selectors = '{{ block.settings.price_container_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
-  const price_sale_selectors = '{{ block.settings.price_sale_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
-  const price_compare_selectors = '{{ block.settings.price_compare_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
-  const signalMoneyFormat = window.money_format || "{{ shop.money_format }}"
+  const modal_trigger_selectors = '{{ block.settings.modal_trigger_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector); {% endcomment %}
+  {% comment %} const price_sale_selectors = '{{ block.settings.price_sale_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector);
+  const price_compare_selectors = '{{ block.settings.price_compare_selector }}'.split(',').map(selector => selector.trim()).filter(selector => selector); {% endcomment %}
 
     // image testing
-    const product_card_container_selectors = '{{ block.settings.product_card_container_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
+    {% comment %} const product_card_container_selectors = '{{ block.settings.product_card_container_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
   const product_card_image_selectors = '{{ block.settings.product_card_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
   const product_card_inner_selectors = '{{ block.settings.product_card_inner_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
   const product_card_media_container_selectors = '{{ block.settings.product_card_media_container_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
@@ -25,7 +25,7 @@
   const single_product_image_selectors = '{{ block.settings.single_product_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
 
   const predictive_search_item_selectors = '{{ block.settings.predictive_search_item_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
-  const predictive_search_image_selectors = '{{ block.settings.predictive_search_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean);
+  const predictive_search_image_selectors = '{{ block.settings.predictive_search_image_selector }}'.split(',').map(s => s.trim()).filter(Boolean); {% endcomment %}
 
 </script>
 {% if block.settings.price_container_selector %}
@@ -38,8 +38,8 @@
   </style>
 {% endif %}
 
-{% comment %} <script defer src="{{ 'signals-price-test.js' | asset_url }}"></script> {% endcomment %}
-<script defer src="{{ 'testing.js' | asset_url }}"></script>
+<script defer src="{{ 'signals-price-test.js' | asset_url }}"></script>
+{% comment %} <script defer src="{{ 'testing_old.js' | asset_url }}"></script> {% endcomment %}
 <script defer src="{{ 'classDetectionModal.js' | asset_url }}"></script>
 <script defer src="{{ 'universalStoreClassPicker.js' | asset_url }}"></script>
 
@@ -52,116 +52,119 @@
   "settings": [   
     {
       "type": "text",
-      "id": "product_card_selector",
-      "label": "Product Card Selector",
-      "default": ".predictive-search__item,.predictive-search-item__link,.product-card, .card-wrapper, .product-card-wrapper",
-      "info": "Comma(,) Separated value for multiple class selectors"
-    },
-    {
-      "type": "text",
-      "id": "single_product_selector",
-      "label": "Single Product Selector",
-      "default": ".product-single, .product, .product-template",
-      "info": "Comma(,) Separated value for multiple class selectors"
-    },
-    {
-      "type": "text",
-      "id": "search_input_selector",
-      "label": "Search Input Selector",
-      "default": ".search__input",
-      "info": "Comma(,) Separated value for multiple class selectors"
-    },
-    {
-      "type": "text",
-      "id": "modal_trigger_selector",
-      "label": "Modal Trigger Selector",
-      "default": "modal-opener",
-      "info": "Comma(,) Separated value for multiple class selectors"
-    },
-    {
-      "type": "text",
       "id": "price_container_selector",
-      "label": "Price Container Selector",
+      "label": "Flicker Container Selector",
       "default": ".price__pricing-group, .price, .price__container, ",
       "info": "Comma(,) Separated value for multiple class selectors"
     },
-    {
-      "type": "text",
-      "id": "price_compare_selector",
-      "label": "Price Compare Selector",
-      "default": ".price-item--regular",
-    },
-    {
-      "type": "text",
-      "id": "price_sale_selector",
-      "label": "Price Sale Selector",
-      "default": ".price-item--sale",
-      "info": "Comma(,) Separated value for multiple class selectors"
-    },
-    {
-      "type": "text",
-      "id": "product_card_inner_selector",
-      "label": "Product Card Inner Selector",
-      "default": ".card__inner",
-      "info": "Comma-separated selectors for product card inner wrappers."
-    },
-    {
-      "type": "text",
-      "id": "product_card_media_container_selector",
-      "label": "Product Card Media Container Selector",
-      "default": ".card__media, .grid-view-item__image-wrapper",
-      "info": "Comma-separated selectors for product card media containers."
-    },
-    {
-      "type": "text",
-      "id": "product_card_heading_selector",
-      "label": "Product Card Heading Selector",
-      "default": ".card__heading, .grid-view-item__title",
-      "info": "Comma-separated selectors for product card headings."
-    },
-    {
-      "type": "text",
-      "id": "single_product_container_selector",
-      "label": "Single Product Container Selector",
-      "default": "[data-product-id], .product.product--large",
-      "info": "Comma-separated selectors for single product containers (image testing)."
-    },
-    {
-      "type": "text",
-      "id": "single_product_image_selector",
-      "label": "Single Product Image Selector",
-      "default": ".product__media img, .product-gallery__image, .product__media-item img, .product__media.media img, .image-magnify-lightbox",
-      "info": "Comma-separated selectors for single product images."
-    },
-    {
-      "type": "text",
-      "id": "predictive_search_item_selector",
-      "label": "Predictive Search Item Selector",
-      "default": ".predictive-search__list-item",
-      "info": "Comma-separated selectors for predictive search result items."
-    },
-    {
-      "type": "text",
-      "id": "predictive_search_image_selector",
-      "label": "Predictive Search Image Selector",
-      "default": ".predictive-search__image",
-      "info": "Comma-separated selectors for predictive search result images."
-    },
-    {
-      "type": "text",
-      "id": "product_card_image_selector",
-      "label": "Product Card Image Selector",
-      "default": ".product-media-container img, .product__media img",
-      "info": "Comma-separated selectors for product card images."
-    },
-    {
-      "type": "text",
-      "id": "product_card_media_container",
-      "label": "product Card Media Container",
-      "default": ".product-media-container'",
-      "info": "Comma-separated selectors for product card images."
-    },
+
     
   ]
 }
 {% endschema %}
+
+{% comment %} {
+  "type": "text",
+  "id": "product_card_selector",
+  "label": "Product Card Selector",
+  "default": ".predictive-search__item,.predictive-search-item__link,.product-card, .card-wrapper, .product-card-wrapper",
+  "info": "Comma(,) Separated value for multiple class selectors"
+},
+{
+  "type": "text",
+  "id": "single_product_selector",
+  "label": "Single Product Selector",
+  "default": ".product-single, .product, .product-template",
+  "info": "Comma(,) Separated value for multiple class selectors"
+},
+{
+  "type": "text",
+  "id": "search_input_selector",
+  "label": "Search Input Selector",
+  "default": ".search__input",
+  "info": "Comma(,) Separated value for multiple class selectors"
+},
+{
+  "type": "text",
+  "id": "modal_trigger_selector",
+  "label": "Modal Trigger Selector",
+  "default": "modal-opener",
+  "info": "Comma(,) Separated value for multiple class selectors"
+},
+
+{
+  "type": "text",
+  "id": "price_compare_selector",
+  "label": "Price Compare Selector",
+  "default": ".price-item--regular",
+},
+{
+  "type": "text",
+  "id": "price_sale_selector",
+  "label": "Price Sale Selector",
+  "default": ".price-item--sale",
+  "info": "Comma(,) Separated value for multiple class selectors"
+},
+{
+  "type": "text",
+  "id": "product_card_inner_selector",
+  "label": "Product Card Inner Selector",
+  "default": ".card__inner",
+  "info": "Comma-separated selectors for product card inner wrappers."
+},
+{
+  "type": "text",
+  "id": "product_card_media_container_selector",
+  "label": "Product Card Media Container Selector",
+  "default": ".card__media, .grid-view-item__image-wrapper",
+  "info": "Comma-separated selectors for product card media containers."
+},
+{
+  "type": "text",
+  "id": "product_card_heading_selector",
+  "label": "Product Card Heading Selector",
+  "default": ".card__heading, .grid-view-item__title",
+  "info": "Comma-separated selectors for product card headings."
+},
+{
+  "type": "text",
+  "id": "single_product_container_selector",
+  "label": "Single Product Container Selector",
+  "default": "[data-product-id], .product.product--large",
+  "info": "Comma-separated selectors for single product containers (image testing)."
+},
+{
+  "type": "text",
+  "id": "single_product_image_selector",
+  "label": "Single Product Image Selector",
+  "default": ".product__media img, .product-gallery__image, .product__media-item img, .product__media.media img, .image-magnify-lightbox",
+  "info": "Comma-separated selectors for single product images."
+},
+{
+  "type": "text",
+  "id": "predictive_search_item_selector",
+  "label": "Predictive Search Item Selector",
+  "default": ".predictive-search__list-item",
+  "info": "Comma-separated selectors for predictive search result items."
+},
+{
+  "type": "text",
+  "id": "predictive_search_image_selector",
+  "label": "Predictive Search Image Selector",
+  "default": ".predictive-search__image",
+  "info": "Comma-separated selectors for predictive search result images."
+},
+{
+  "type": "text",
+  "id": "product_card_image_selector",
+  "label": "Product Card Image Selector",
+  "default": ".product-media-container img, .product__media img",
+  "info": "Comma-separated selectors for product card images."
+},
+{
+  "type": "text",
+  "id": "product_card_media_container",
+  "label": "product Card Media Container",
+  "default": ".product-media-container'",
+  "info": "Comma-separated selectors for product card images."
+}, {% endcomment %}
