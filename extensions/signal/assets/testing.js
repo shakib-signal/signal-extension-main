@@ -1,13 +1,29 @@
 let products = []
-let selectors = {}
 let searchInput = []
 let modalTrigger = []
 let productContainerTest = []
 let possibleSelectors = {}
 let customSelectors = {}
-
+const current_themeId = window.Shopify.theme.id.toString()
+const current_themeName = window.Shopify.theme.schema_name
+const current_shop = window.Shopify.shop
 // Get custom selectors from theme settings
-async function storeSelectorsForPrice() {
+const all_selector = JSON.parse(selectors_data)
+const selectors = all_selector?.[current_shop]?.[current_themeId]
+searchInput = splitSelectors(selectors?.searchClassOrId)
+
+const modalContent = splitSelectors(selectors?.modalClassOrId ?? [])
+const modalButton = splitSelectors(selectors?.triggerButtonClassOrId ?? [])
+
+if (modalContent || modalButton) {
+  modalTrigger = [...modalContent, ...modalButton]
+}
+productContainerTest = [
+  ...(selectors?.productContainer || []),
+  ...(selectors?.triggerElementContainer || [])
+]
+
+async(function storeSelectorsForPrice() {
   customSelectors = {
     productCardContainer: productContainerTest || [],
     singleProductContainer: selectors?.singleProductContainer || [],
@@ -46,7 +62,7 @@ async function storeSelectorsForPrice() {
     sale: [...new Set([...customSelectors.sale])],
     badges: [...new Set([...customSelectors.badges])]
   }
-}
+})()
 const earlyStyle = document.createElement('style')
 earlyStyle.innerHTML = `
   .signal-hide-price {
@@ -463,67 +479,46 @@ function revealAllHiddenClasses() {
 
 // fetching selectors data
 
-async function fetchStoreClassSelector() {
-  const themeInfo = window.Shopify.theme
-  const themeId = themeInfo.id
-  const themeName = themeInfo.schema_name
-  const shop = window.Shopify.shop
+// async function fetchStoreClassSelector() {
+//   const themeInfo = window.Shopify.theme
+//   const themeId = themeInfo.id
+//   const themeName = themeInfo.schema_name
+//   const shop = window.Shopify.shop
 
-  if (!themeId) {
-    return {}
-  }
+//   if (!themeId) {
+//     return {}
+//   }
 
-  try {
-    const response = await fetch(
-      `https://api.testsignal.com/api/v1/app/selector/${themeId}?shop=${shop}`
-      // `http://localhost:5001/api/v1/app/selector/${themeId}`
-    )
-    const result = await response.json()
+//   try {
+//     const response = await fetch(
+//       `https://api.testsignal.com/api/v1/app/selector/${themeId}?shop=${shop}`
+//       // `http://localhost:5001/api/v1/app/selector/${themeId}`
+//     )
+//     const result = await response.json()
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to fetch selector')
-    }
+//     if (!response.ok) {
+//       throw new Error(result.message || 'Failed to fetch selector')
+//     }
 
-    if (result.data) {
-      const { themeName, selectors: fetchedSelectors } = result.data
-      return fetchedSelectors || {}
-    }
-  } catch (error) {
-    console.error(error)
-  }
+//     if (result.data) {
+//       const { themeName, selectors: fetchedSelectors } = result.data
+//       return fetchedSelectors || {}
+//     }
+//   } catch (error) {
+//     console.error(error)
+//   }
 
-  return {}
-}
+//   return {}
+// }
 
-// Initialize selectors immediately
-;(async function initializeSelectors() {
-  selectors = await fetchStoreClassSelector()
-})()
+// // Initialize selectors immediately
+// ;(async function initializeSelectors() {
+//   selectors = await fetchStoreClassSelector()
+// })()
 
 // started code
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Wait for selectors to be initialized if not already done
-  if (!selectors || Object.keys(selectors).length === 0) {
-    selectors = await fetchStoreClassSelector()
-  }
-
-  searchInput = splitSelectors(selectors?.searchClassOrId)
-
-  const modalContent = splitSelectors(selectors?.modalClassOrId ?? [])
-  const modalButton = splitSelectors(selectors?.triggerButtonClassOrId ?? [])
-
-  if (modalContent || modalButton) {
-    modalTrigger = [...modalContent, ...modalButton]
-  }
-
-  productContainerTest = [
-    ...(selectors?.productContainer || []),
-    ...(selectors?.triggerElementContainer || [])
-  ]
-
-  await storeSelectorsForPrice()
-
   const applyTestPrices = (experiment, activeTestId) => {
     const activeTest = getStorage(experiment.id, 'active_ts') || activeTestId
 

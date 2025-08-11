@@ -1,6 +1,6 @@
 <script>
   const signal_rules = '{{ app.metafields.signal_experiments.signal_price_testing_rules.value | json}}'
-  const signal_selectors = '{{ app.metafields.selectors_by_theme.signal_selector_data.value | json}}'
+ 	const selectors_data = '{{ app.metafields.signal_selector_data.selectors_by_theme.value | json}}'
   	const preview_data = '{{ app.metafields.signal_preview.signal_preview_data.value | json}}'
   const shop = '{{ shop.permanent_domain }}';
   const firstVariant_product = '{{ product.variants.first.id }}';
