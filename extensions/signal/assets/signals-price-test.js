@@ -526,6 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             parseFloat(product?.compareAtPrice)) *
             100
         )
+
         const obj = {
           ...product,
           compareAtPrice: parseFloat(product?.compareAtPrice ?? 0),
@@ -618,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             customSelectors.searchInputSelector.length > 0
               ? `${customSelectors.searchInputSelector.join(',')},`
               : ''
-          } input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+          } .slider--search-presets, input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
         )
         if (!searchResult) return
 
@@ -643,7 +644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             customSelectors.modalTriggerSelector.length > 0
               ? `${customSelectors.modalTriggerSelector.join(',')},`
               : ''
-          } [data-modal-trigger], [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
+          } [data-modal-trigger],.predictive-search, [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
         )
         if (!modalTrigger) return
 
@@ -800,10 +801,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     return foundElements
   }
   const getIdFromCartForm = (event = null) => {
-    const form = event
+    let form = event
       ? event.target.closest('form[action*="/cart/add"]')
       : document.querySelector('form[action*="/cart/add"]')
-    if (!form) return null
+    if (!form) {
+      form = document.querySelector('form[action*="/cart/add"]')
+      if (!form) {
+        console.warn('No form found for cart add action')
+        return null
+      }
+    }
     const select = form.querySelector('select[name="id"]')
     if (select) return select.value
     const hidden = form.querySelector('input[name="id"]')
@@ -831,6 +838,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Fallback: If no input was passed or input didn't contain variant ID, look for a variant selector in the product form
     return getIdFromCartForm()
   }
+
+  const sellingPlanHandler = (event) => {
+    if (event.target.matches('[name="selling_plan_toggle"]')) {
+      const select = document.querySelector('.js-selling-plan-select')
+      const isOn = event.target.checked
+      consoleLog(
+        isOn ? '✅ Subscription ON' : '❌ Subscription OFF',
+        isOn ? select.value : null
+      )
+    }
+  }
+  // change handler
   const variantHandler = (event) => {
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
@@ -841,6 +860,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
+      sellingPlanHandler(event)
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
       )
@@ -974,7 +994,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateDom(el, compareAtPrice)
           })
         } else {
-          updateDom(priceEl, compareAtPrice) // fallback
+          updateDom(priceEl, price) // fallback
         }
       }
     })
@@ -1025,6 +1045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       .find((product) => {
         return product.variantId == variantId
       })
+
     if (!matchedProduct) {
       console.warn('Active variant not found in products list.')
       revealAllHiddenClasses()
@@ -1075,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       revealAllHiddenClasses()
       return
     }
+
     const sortedProducts = sortCatalogProducts()
     sortedProducts.forEach((product) => {
       const {
@@ -1123,6 +1145,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // Find and update price elements
           const priceElements = findPriceElements(productContainer)
+
           updatePriceElements(
             priceElements,
             price,
@@ -1144,9 +1167,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       // On product page, try to update single product price first
       updateSingleProductPrice(variantId)
     } else if (window.location.pathname.includes('/products/')) {
-      const getVariantIdFromUrl =
-        window.location.search.split('variant=')[1] || null
-      let variantId = getVariantIdFromUrl ?? firstVariant_product
+      const urlParams = new URLSearchParams(window.location.search)
+      const variantFromURL = urlParams.get('variant')
+      let variantId = variantFromURL ?? firstVariant_product
       updateSingleProductPrice(variantId)
     } else {
       updateProductPricesOnCard()
@@ -2689,13 +2712,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error(e)
     }
   })
-  setupPriceContainerObserver()
   setTimeout(() => {
     revelAllHiddenPrices()
   }, 600)
   waitForProductPriceAndRun()
-  // onVariantUrlChange(updateHydrozenThemePrices)
+  setupPriceContainerObserver()
   setupSearchAndModalListeners()
+  // onVariantUrlChange(updateHydrozenThemePrices)
 
   // Add click handler for product links
   document.addEventListener('click', (event) => {
@@ -3076,6 +3099,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === 1) {
           updateProductPricesOnCard()
+          setTimeout(() => {
+            revelAllHiddenPrices()
+          }, 600)
           // Element node
 
           // Check if the added node is a form
