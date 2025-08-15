@@ -285,14 +285,14 @@ register(({ analytics, browser, init }) => {
 
     sendEventToTracker(payload)
 
-    if (eventName === 'add_to_cart') {
-      setAbandonmentTimer({
-        key: 'cart',
-        eventName: 'cart',
-        payload,
-        timeoutMs: 2 * 60 * 1000
-      })
-    }
+    // if (eventName === 'add_to_cart') {
+    //   setAbandonmentTimer({
+    //     key: 'cart',
+    //     eventName: 'cart',
+    //     payload,
+    //     timeoutMs: 2 * 60 * 1000
+    //   })
+    // }
   }
 
   // build checkout events payload
@@ -422,11 +422,11 @@ register(({ analytics, browser, init }) => {
       sendEventToTracker(payload)
 
       // Set abandonment timeout
-      setAbandonmentTimer({
-        key: 'checkout',
-        eventName: 'checkout',
-        payload
-      })
+      // setAbandonmentTimer({
+      //   key: 'checkout',
+      //   eventName: 'checkout',
+      //   payload
+      // })
     }
   })
 
@@ -453,11 +453,11 @@ register(({ analytics, browser, init }) => {
     })
     if (payload) {
       sendEventToTracker(payload)
-      setAbandonmentTimer({
-        key: 'checkout',
-        eventName: 'checkout',
-        payload
-      })
+      // setAbandonmentTimer({
+      //   key: 'checkout',
+      //   eventName: 'checkout',
+      //   payload
+      // })
     }
   })
   analytics.subscribe('checkout_contact_info_submitted', async (event) => {
@@ -475,18 +475,18 @@ register(({ analytics, browser, init }) => {
     })
     if (payload) {
       sendEventToTracker(payload)
-      setAbandonmentTimer({
-        key: 'checkout',
-        eventName: 'checkout',
-        payload
-      })
+      // setAbandonmentTimer({
+      //   key: 'checkout',
+      //   eventName: 'checkout',
+      //   payload
+      // })
     }
   })
 
   // Track purchase event
 
   analytics.subscribe('checkout_completed', async (event) => {
-    setAbandonmentTimer({ key: 'purchase' })
+    // setAbandonmentTimer({ key: 'purchase' })
 
     const paymentTransactions = event.data.checkout.transactions?.map(
       (transaction) => ({
