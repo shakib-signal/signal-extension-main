@@ -4,6 +4,7 @@ let modalTrigger = []
 let productContainerTest = []
 let possibleSelectors = {}
 let customSelectors = {}
+let sellingObj = {}
 const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
@@ -840,14 +841,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const sellingPlanHandler = (event) => {
-    if (event.target.matches('[name="selling_plan_toggle"]')) {
-      const select = document.querySelector('.js-selling-plan-select')
-      const isOn = event.target.checked
-      consoleLog(
-        isOn ? '✅ Subscription ON' : '❌ Subscription OFF',
-        isOn ? select.value : null
-      )
+    let toggle = null
+    if (event && event.target.matches('[name="selling_plan_toggle"]')) {
+      toggle = event.target
+    } else {
+      toggle = document.querySelector('[name="selling_plan_toggle"]')
     }
+    if (!toggle) return
+    const select = toggle.getAttribute('data-id')
+    const isOn = toggle.checked
+
+    sellingObj = {
+      isToglleOn: isOn,
+      value: select
+    }
+    return sellingObj
   }
   // change handler
   const variantHandler = (event) => {
@@ -1037,6 +1045,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   }
 
+  function subscribeSellingPlane(
+    matchedProduct,
+    testPrice,
+    products,
+    variantId
+  ) {
+    const selectedPlanId = sellingObj?.value
+    const selectedSellingPlan = matchedProduct?.sellingPlan?.find(
+      (plan) => plan?.id?.split('/').pop() === selectedPlanId
+    )
+    const sellingDiscount = selectedSellingPlan?.percentage
+
+    const price = sellingDiscount
+      ? testPrice - (testPrice * sellingDiscount) / 100
+      : testPrice
+    const productToUpdate = products.find(
+      (product) => product.variantId == variantId
+    )
+    if (productToUpdate) {
+      productToUpdate.sellingPrice = price
+      productToUpdate.isSellingPlanEnable = true
+    }
+    return price
+  }
+
   // Helper function to update sale class
 
   function updateSingleProductPrice(variantId) {
@@ -1052,14 +1085,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       return
     }
 
-    const { price, compareAtPrice, discountAmount, discountPercentage } =
+    let { price, compareAtPrice, discountAmount, discountPercentage } =
       matchedProduct
-    // console.log('singleProduct-container', possibleSelectors.singleProductContainer)
+
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
     )
 
     if (!productContainer) return
+
+    if (sellingObj?.isToglleOn) {
+      price = subscribeSellingPlane(matchedProduct, price, products, variantId)
+    }
 
     // Find and update price elements
     const priceElements = findPriceElements(productContainer)
@@ -1163,6 +1200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       revealAllHiddenClasses()
       return
     }
+    sellingPlanHandler()
     if (variantId) {
       // On product page, try to update single product price first
       updateSingleProductPrice(variantId)
@@ -3001,7 +3039,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       .find((p) => p.variantId === variantId)
 
     const discountAmount = parseFloat(priceTestExp?.discountAmount).toFixed(2)
-    const price = parseFloat(priceTestExp?.price).toFixed(2)
+    let price
+    if (sellingObj?.isToggleOn) {
+      price = parseFloat(priceTestExp?.sellingPrice).toFixed(2)
+    } else {
+      price = parseFloat(priceTestExp?.price).toFixed(2)
+    }
+    // const price = parseFloat(priceTestExp?.price).toFixed(2)
     const experimentId = priceTestExp?.experimentId
     const testId = priceTestExp?.testId
 
@@ -3040,6 +3084,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       body: JSON.stringify({
         id: variantId,
         quantity: quantity > 0 ? quantity : 1,
+        sections: 'header,cart-drawer,cart-page,cart-json',
+        ...(sellingObj?.isToggleOn && {
+          selling_plan: sellingObj?.value
+        }),
         properties: {
           __si_exp: JSON.stringify(properties)
         }
