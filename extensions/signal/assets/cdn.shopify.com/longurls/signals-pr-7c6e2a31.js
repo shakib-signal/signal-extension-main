@@ -852,7 +852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isOn = toggle.checked
 
     sellingObj = {
-      isToglleOn: isOn,
+      isToggleOn: isOn,
       value: select
     }
     return sellingObj
@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!productContainer) return
 
-    if (sellingObj?.isToglleOn) {
+    if (sellingObj?.isToggleOn) {
       price = subscribeSellingPlane(matchedProduct, price, products, variantId)
     }
 
@@ -2989,7 +2989,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         consoleLog('Cart drawer refreshed and opened.')
       } catch (error) {
         console.error('Error updating cart drawer:', error)
-        window.location.href = '/cart'
+        // window.location.href = '/cart'
       }
     } else {
       // Fallback to default cart page if drawer doesn't exist

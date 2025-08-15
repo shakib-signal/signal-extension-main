@@ -852,7 +852,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isOn = toggle.checked
 
     sellingObj = {
-      isToglleOn: isOn,
+      isToggleOn: isOn,
       value: select
     }
     return sellingObj
@@ -1094,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!productContainer) return
 
-    if (sellingObj?.isToglleOn) {
+    if (sellingObj?.isToggleOn) {
       price = subscribeSellingPlane(matchedProduct, price, products, variantId)
     }
 
@@ -3075,7 +3075,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       __si_p: price,
       __si_d: discountAmount,
       __si_ud: userId,
-      __si_exp: experimentString
+      __si_exp: experimentString,
+      ...(sellingObj?.isToggleOn && {
+        selling_plan: sellingObj?.value
+      })
     }
 
     fetch('/cart/add.js', {
@@ -3085,9 +3088,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         id: variantId,
         quantity: quantity > 0 ? quantity : 1,
         sections: 'header,cart-drawer,cart-page,cart-json',
-        ...(sellingObj?.isToggleOn && {
-          selling_plan: sellingObj?.value
-        }),
+
         properties: {
           __si_exp: JSON.stringify(properties)
         }
