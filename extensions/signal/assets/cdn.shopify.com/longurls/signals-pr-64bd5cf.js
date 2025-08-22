@@ -533,7 +533,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           compareAtPrice: parseFloat(product?.compareAtPrice ?? 0),
           schedule: experiment?.schedule,
           experimentType: experiment?.experimentType,
-          discountPercentage
+          discountPercentage,
+          isSellingPlanEnable: false,
+          sellingPrice: null
         }
         return obj
       })
@@ -842,14 +844,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const sellingPlanHandler = (event) => {
     let toggle = null
-    if (event && event.target.matches('[name="selling_plan_toggle"]')) {
+    if (
+      event &&
+      event.target.matches(
+        '[name="selling_plan_toggle"], [name="selling_plan"]'
+      )
+    ) {
       toggle = event.target
     } else {
-      toggle = document.querySelector('[name="selling_plan_toggle"]')
+      toggle = document.querySelector(
+        '[name="selling_plan_toggle"], [name="selling_plan"]'
+      )
     }
     if (!toggle) return
-    const select = toggle.getAttribute('data-id')
-    const isOn = toggle.checked
+    const select = toggle.getAttribute('data-id') || toggle.value
+    const isOn = toggle.checked || (toggle.value != '' ? true : false)
 
     sellingObj = {
       isToggleOn: isOn,
@@ -1056,6 +1065,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       (plan) => plan?.id?.split('/').pop() === selectedPlanId
     )
     const sellingDiscount = selectedSellingPlan?.percentage
+    console.log({ sellingDiscount })
 
     const price = sellingDiscount
       ? testPrice - (testPrice * sellingDiscount) / 100
@@ -1066,6 +1076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (productToUpdate) {
       productToUpdate.sellingPrice = price
       productToUpdate.isSellingPlanEnable = true
+      productToUpdate.sellingDiscount = sellingDiscount
     }
     return price
   }
@@ -1091,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
     )
+    console.log('sellingObj', sellingObj)
 
     if (!productContainer) return
 
@@ -2994,7 +3006,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       // Fallback to default cart page if drawer doesn't exist
       window.location.href = '/cart'
+      consoleLog('No cart drawer found. Proceeding with default.')
     }
+  }
+  function attachSellingPlan(lineId, sellingPlanId) {
+    fetch('/cart/change.js', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        line: lineId, // the cart line key from previous step
+        selling_plan: sellingPlanId
+      })
+    })
+      .then((res) => res.json())
+      .then((updatedCart) => {
+        console.log('Selling plan attached, discount applied', updatedCart)
+      })
   }
 
   function handleAddToCart(event, form) {
@@ -3039,12 +3066,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .find((p) => p.variantId === variantId)
 
     const discountAmount = parseFloat(priceTestExp?.discountAmount).toFixed(2)
-    let price
-    if (sellingObj?.isToggleOn) {
-      price = parseFloat(priceTestExp?.sellingPrice).toFixed(2)
-    } else {
-      price = parseFloat(priceTestExp?.price).toFixed(2)
-    }
+
+    const price = parseFloat(priceTestExp?.price).toFixed(2)
     // const price = parseFloat(priceTestExp?.price).toFixed(2)
     const experimentId = priceTestExp?.experimentId
     const testId = priceTestExp?.testId
@@ -3074,6 +3097,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const properties = {
       __si_p: price,
       __si_d: discountAmount,
+      // __si_sub: sellingObj?.isToggleOn ? priceTestExp?.sellingDiscount : '',
       __si_ud: userId,
       __si_exp: experimentString
     }
@@ -3085,20 +3109,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         id: variantId,
         quantity: quantity > 0 ? quantity : 1,
         sections: 'header,cart-drawer,cart-page,cart-json',
-        ...(sellingObj?.isToggleOn && {
-          selling_plan: sellingObj?.value
-        }),
+        // ...(sellingObj?.isToggleOn && {
+        //   selling_plan: sellingObj?.value
+        // }),
         properties: {
           __si_exp: JSON.stringify(properties)
         }
       })
     })
-      .then(async () => {
+      .then(async (response) => {
+        const cart = await response.json()
         await handleCartDrawerUpdate()
+
+        // Handle selling plan attachment if enabled
+        if (sellingObj?.isToggleOn && sellingObj?.value) {
+          // Find the line item that was just added (usually the last one)
+          const lastItem = cart.items[cart.items.length - 1]
+          if (lastItem) {
+            attachSellingPlan(lastItem.key, sellingObj.value)
+          }
+        }
       })
       .catch((error) => {
         console.error('Error adding to cart:', error)
-        form.submit()
+        // form.submit()
       })
       .finally(() => {
         addButton?.classList.remove('is-loading', 'app-loading-white')

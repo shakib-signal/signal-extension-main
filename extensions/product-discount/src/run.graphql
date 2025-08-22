@@ -2,13 +2,24 @@ query RunInput {
   cart {
     lines {
       id
-      attribute(key: "__si_d") {
+      attribute(key: "__si_ex") {
         value
       }
       quantity
       merchandise {
         __typename
         ... on ProductVariant {
+          id
+        }
+      }
+      sellingPlanAllocation {
+        priceAdjustments {
+          price {
+            amount
+            currencyCode
+          }
+        }
+        sellingPlan {
           id
         }
       }

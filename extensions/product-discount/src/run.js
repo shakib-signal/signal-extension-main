@@ -6,9 +6,6 @@ import { DiscountApplicationStrategy } from '../generated/api'
  * @typedef {import("../generated/api").FunctionRunResult} FunctionRunResult
  */
 
-/**
- * @type {FunctionRunResult}
- */
 const EMPTY_DISCOUNT = {
   discountApplicationStrategy: DiscountApplicationStrategy.First,
   discounts: []
@@ -19,31 +16,54 @@ const EMPTY_DISCOUNT = {
  * @returns {FunctionRunResult}
  */
 export function run(input) {
-  const discountedItems = input.cart.lines.filter(
+  // Only subscription lines
+  const subscriptionLines = input.cart.lines.filter(
     (line) =>
-      line.attribute?.value && line.merchandise.__typename == 'ProductVariant'
+      line.attribute?.value &&
+      line.sellingPlanAllocation &&
+      line.merchandise.__typename === 'ProductVariant'
   )
-  if (!discountedItems.length) return EMPTY_DISCOUNT
-  const discounts = discountedItems.map((line) => {
-    const variant = line.merchandise
-    const discountedAmount = line?.attribute?.value
-      ? parseFloat(line.attribute.value) * line.quantity
-      : 0
 
-    return {
-      message: `__${line?.attribute?.value}`,
-      targets: [
-        {
-          productVariant: {
-            id: variant.__typename === 'ProductVariant' ? variant.id : ''
-            // quantity: line?.quantity
-          }
+  if (!subscriptionLines.length) return EMPTY_DISCOUNT
+
+  const discounts = subscriptionLines
+    .map((line) => {
+      const merch = line.merchandise
+      // Only handle ProductVariant
+      if (merch.__typename !== 'ProductVariant') return null
+
+      const variant = merch // this is the ProductVariant object
+      const variantId = variant.id // safe, because __typename is ProductVariant
+
+      const experiment = line.attribute?.value
+        ? JSON.parse(line.attribute.value)
+        : {}
+      const currentPrice = parseFloat(experiment.__si_p || 0)
+      const discountPercentage = parseFloat(experiment.__si_sub || 0)
+      const discountAmount =
+        currentPrice * (discountPercentage / 100) * line.quantity
+
+      console.log(
+        JSON.stringify({
+          discountAmount,
+          quantity: line.quantity,
+          experiment
+        })
+      )
+
+      if (discountAmount > 0) {
+        return {
+          message: `Subscription discount`,
+          targets: [{ productVariant: { id: variantId } }],
+          value: { fixedAmount: { amount: discountAmount.toFixed(2) } }
         }
-      ],
-      // value: { percentage: { value: discountedAmount } }
-      value: { fixedAmount: { amount: discountedAmount.toFixed(2) } }
-    }
-  })
+      }
+
+      return null
+    })
+    .filter(function (d) {
+      return d !== null // remove null values
+    })
 
   return {
     discounts,

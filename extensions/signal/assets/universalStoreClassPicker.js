@@ -11,9 +11,12 @@ let universel_compareEl = null
 let universel_badgeEl = null
 let universel_contentEl = null
 let universel_imageEl = null
+let universel_singleImgEl = null
 let universel_triggerEl = null
 let universel_searchEL = null
 let universel_modalEl = null
+let universel_searchImgEl = null
+let universel_searchLinkEl = null
 let universel_regularOriginalText = ''
 let universel_compareOriginalText = ''
 let universel_badgeOrginalText = ''
@@ -31,6 +34,7 @@ let universel_compareAtPrice
 let universel_badge
 let universel_triggerElement
 let universel_triggerClass
+let universel_searchTriggerImg
 let universel_eventTracker = false
 let universel_referrerUrl
 let universel_payload
@@ -45,14 +49,18 @@ let universel_productContainer = []
 let universel_singleProductContainer = []
 let universel_textClassOrId = []
 let universel_imgClassOrId = []
+let universel_singleImgClassOrId = []
 let universel_triggerButtonClassOrId = []
 let universel_searchClassOrId = []
 let universel_modalClassOrId = []
 let universel_contentContainer = []
 let universel_imageContainer = []
+let universel_singleProductImageContainer = []
 let universel_addtocartSelector = []
 let universel_triggerButtonContainer = []
 let universel_triggerElementContainer = []
+let universel_searchItemLink = []
+let universel_searchImage = []
 const universel_PAYLOAD_KEY = 'signal_selector_info'
 const universel_ACTIVE_KEY = 'signal_test_info'
 let universel_activeTab = null
@@ -156,7 +164,7 @@ function universel_showModalIfAllowed() {
 
   universel_parsedPayload = JSON.parse(universel_storedPayload)
   if (
-    universel_referrerUrl === 'https://admin.testsignal.com/' ||
+    universel_referrerUrl === 'https://admin.testsignal.com' ||
     (universel_parsedPayload.appName === 'Signal-config' &&
       universel_parsedPayload.requestFrom === 'Store-config')
   ) {
@@ -244,8 +252,15 @@ async function universel_fetchSelector() {
         universel_imgClassOrId.push(is)
         universel_imageEl = is
       })
+      selectors?.singleImgClassOrId?.forEach((sis) => {
+        universel_singleImgClassOrId.push(sis)
+        universel_singleImgEl = sis
+      })
       selectors?.imageContainer?.forEach((ic) => {
         universel_imageContainer.push(ic)
+      })
+      selectors?.singleProductImageContainer?.forEach((spic) => {
+        universel_singleProductImageContainer.push(spic)
       })
       selectors?.triggerButtonClassOrId?.forEach((tbs) => {
         universel_triggerButtonClassOrId.push(tbs)
@@ -270,6 +285,12 @@ async function universel_fetchSelector() {
       })
       selectors?.addtocartSelector?.forEach((atc) => {
         universel_addtocartSelector.push(atc)
+      })
+      selectors?.searchItemLink?.forEach((sil) => {
+        universel_searchItemLink.push(sil)
+      })
+      selectors?.searchImage?.forEach((si) => {
+        universel_searchImage.push(si)
       })
 
       // console.log('resultData', universel_themeName, selectors)
@@ -722,14 +743,33 @@ function universel_renderModal() {
 									</div>
 								</div>
 							</div>
-							<input type="text" id="universel_targetImageInfo" readonly placeholder= ".card__media .media.media--transparent.media--hover-effect .catalog-edit-wrapper .motion-reduce" style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" />
+							${
+                window.location.pathname.startsWith('/products/')
+                  ? `
+								<input type="text" id="universel_singleTargetImageInfo" readonly placeholder= ".card__media .media.media--transparent.media--hover-effect .catalog-edit-wrapper .motion-reduce" style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" />
+								`
+                  : `
+								<input type="text" id="universel_targetImageInfo" readonly placeholder= ".card__media .media.media--transparent.media--hover-effect .catalog-edit-wrapper .motion-reduce" style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" />
+								`
+              }
 						</div>
+							${
+                window.location.pathname.startsWith('/products/')
+                  ? `<div>
+							<label style="color: #020617">
+								<strong>Single Product Container</strong>
+								</label>
+								<input type="text" id="universel_singleTargetImageContainer" readonly placeholder= ".product-card-wrapper" style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" />
+						</div>`
+                  : `
 						<div>
 							<label style="color: #020617">
-							<strong>Element Container</strong>
+							<strong>Product Container</strong>
 							</label>
 							<input type="text" id="universel_targetImageContainer" readonly placeholder= ".product-card-wrapper" style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" />
 						</div>
+						`
+              }
 
 						<div style="display: flex; gap: 20px; align-items: flex-start; margin-top: 16px;">
 							<!-- Selected Image Preview -->
@@ -895,6 +935,7 @@ function universel_renderModal() {
 				<div style="display: flex; width: 100%; gap: 12px; margin-bottom: 12px; border-radius: 8px; padding: 10px; background-color: #F1F5F9">
 					<button id="trigger-element" class="universel_tab-button universel_active-tab">Trigger Element</button>
 					<button id="trigger-class" class="universel_tab-button">Trigger Class</button>
+					<!-- <button id="search-image" class="universel_tab-button">Search Image</button> -->
 				</div>
 				<!-- Tab Container -->
 				<div id="triggerTabContent" style="background: #fff;">
@@ -952,6 +993,34 @@ function universel_renderModal() {
 							<input style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" type="text" id="universel_eventSearchInput" placeholder="#Search-In-Modal.search__input.field__input" />
 							<label style="margin-top: 16px; display: block; color: #020617;" for="universel_eventContainer"><strong>Element Container Selector:</strong></label>
 							<input style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" type="text" id="universel_eventContainer" placeholder="predictive-search" />
+						</div>
+					</div>
+				</div>
+
+				<!-- search-image-tab --!>
+				
+					<div id="universel_search-image-tab" class="universel_tab-section" style="margin-top: 24px; display: none;">
+						<div style="padding: 12px; border: 1px solid #E2E8F0; border-radius: 6px; background: #fff;">
+							<div style="display:flex; align-items: center; justify-content: space-between">
+								<label style="color: #020617"><strong>SearchItemLink Selector:</strong></label>
+								<div style="display:flex; align-items: center; gap: 5px;">
+									<div class= "universel_delete-btn-bg">
+										<svg class= "universel_search-image-delete" data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="20" height="20" >
+										<path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+										</svg>
+									</div>
+									<div class= "universel_picker-btn-bg">
+										<svg class="universel_search-image-trigger" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+										stroke-width="1.5" stroke="currentColor" width="20" height="20" style="color: black;">
+										<path stroke-linecap="round" stroke-linejoin="round"
+											d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+										</svg>
+									</div>
+								</div>
+							</div>
+							<input style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" type="text" id="universel_searchItmeLink" placeholder="predictive-search-itme-link" />
+							<label style="margin-top: 16px; display: block; color: #020617;" for="universel_searchImage"><strong>Search Image Selector:</strong></label>
+							<input style="width: 100%; padding: 8px; margin-top: 6px; border: 1px solid #E2E8F0; border-radius: 4px;" type="text" id="universel_searchImage" placeholder="predictive-search-image" />
 						</div>
 					</div>
 				</div>
@@ -1109,12 +1178,14 @@ function universel_renderModal() {
   function setUpTriggerTab() {
     const triggerElementButton = document.getElementById('trigger-element')
     const triggerClassButton = document.getElementById('trigger-class')
+    // const searchImageButton = document.getElementById('search-image')
 
     if (!triggerElementButton || !triggerClassButton) return
 
     triggerElementButton.onclick = function () {
       universel_triggerElement = true
       universel_triggerClass = false
+      // universel_searchTriggerImg = false
 
       updateTriggerTabUI()
       universel_renderModal()
@@ -1124,35 +1195,63 @@ function universel_renderModal() {
     triggerClassButton.onclick = function () {
       universel_triggerElement = false
       universel_triggerClass = true
+      // universel_searchTriggerImg = false
 
       updateTriggerTabUI()
       universel_renderModal()
       universel_updateButtonStates()
     }
+
+    // searchImageButton.onclick = function () {
+    // 	universel_triggerElement = false
+    // 	universel_triggerClass = false
+    // 	// universel_searchTriggerImg = true
+
+    // 	updateTriggerTabUI()
+    // 	universel_renderModal()
+    // 	universel_updateButtonStates()
+    // }
   }
 
   function updateTriggerTabUI() {
     const triggerElementButton = document.getElementById('trigger-element')
     const triggerClassButton = document.getElementById('trigger-class')
+    // const searchImageButton = document.getElementById('search-image')
 
     const triggerElementTab = document.getElementById('trigger-element-tab')
     const triggerClassTab = document.getElementById(
       'universel_trigger-class-tab'
     )
+    // const searchImageTab = document.getElementById(
+    // 	'universel_search-image-tab'
+    // )
 
     if (universel_triggerElement) {
       triggerElementTab.style.display = 'block'
       triggerClassTab.style.display = 'none'
+      // searchImageTab.style.display = 'none'
 
       triggerElementButton.classList.add('universel_active-tab')
       triggerClassButton.classList.remove('universel_active-tab')
+      // searchImageButton.classList.remove('universel_active-tab')
     } else if (universel_triggerClass) {
       triggerElementTab.style.display = 'none'
       triggerClassTab.style.display = 'block'
+      // searchImageTab.style.display = 'none'
 
       triggerElementButton.classList.remove('universel_active-tab')
       triggerClassButton.classList.add('universel_active-tab')
+      // searchImageButton.classList.remove('universel_active-tab')
     }
+    // else if (universel_searchTriggerImg) {
+    // 	triggerElementTab.style.display = 'none'
+    // 	triggerClassTab.style.display = 'none'
+    // 	searchImageTab.style.display = 'block'
+
+    // 	triggerElementButton.classList.remove('universel_active-tab')
+    // 	triggerClassButton.classList.remove('universel_active-tab')
+    // 	searchImageButton.classList.add('universel_active-tab')
+    // }
   }
 
   if (universel_showPriceSection) {
@@ -1325,8 +1424,13 @@ function universel_renderModal() {
     }
   }
 
+  // show image section
+
   if (universel_showImageSection) {
     const infoInput = document.getElementById('universel_targetImageInfo')
+    const singleInfoInput = document.getElementById(
+      'universel_singleTargetImageInfo'
+    )
     const universel_previewImage = document.getElementById(
       'universel_previewImage'
     )
@@ -1340,26 +1444,62 @@ function universel_renderModal() {
     const containerInput = document.getElementById(
       'universel_targetImageContainer'
     )
+    const singleProductContainerInput = document.getElementById(
+      'universel_singleTargetImageContainer'
+    )
 
-    if (universel_imageEl) {
-      const value = universel_imageEl.trim()
-      if (!universel_imgClassOrId.includes(value)) {
-        universel_imgClassOrId.push(universel_imageEl)
+    if (universel_imageEl || universel_singleImgEl) {
+      if (
+        window.location.pathname.startsWith('/products/') &&
+        universel_singleImgEl
+      ) {
+        const value = universel_singleImgEl.trim()
+        if (!universel_singleImgClassOrId.includes(value)) {
+          universel_singleImgClassOrId.push(universel_singleImgEl)
+        }
+        if (singleInfoInput) {
+          singleInfoInput.value = universel_singleImgClassOrId?.join(' ')
+        }
+      } else {
+        const value = universel_imageEl.trim()
+        if (!universel_imgClassOrId.includes(value)) {
+          universel_imgClassOrId.push(universel_imageEl)
+        }
+        if (infoInput) {
+          infoInput.value = universel_imgClassOrId?.join(' ')
+        }
       }
-      infoInput.value = universel_imgClassOrId?.join(' ')
 
       let container
       if (universel_targetImage) {
         container = findTopmostParentWithClass(universel_targetImage)
       } else {
-        container = universel_imageContainer?.join(' ')
+        if (window.location.pathname.startsWith('/products/')) {
+          container = universel_singleProductImageContainer?.join(' ')
+        } else {
+          container = universel_imageContainer?.join(' ')
+        }
       }
 
+      console.log('container', container)
+
       if (container) {
-        containerInput.value = container
-        const value = container.trim()
-        if (!universel_imageContainer.includes(value)) {
-          universel_imageContainer.push(container)
+        if (window.location.pathname.startsWith('/products/')) {
+          if (singleProductContainerInput) {
+            singleProductContainerInput.value = container
+            const value = container.trim()
+            if (!universel_singleProductImageContainer.includes(value)) {
+              universel_singleProductImageContainer.push(container)
+            }
+          }
+        } else {
+          if (containerInput) {
+            containerInput.value = container
+            const value = container.trim()
+            if (!universel_imageContainer.includes(value)) {
+              universel_imageContainer.push(container)
+            }
+          }
         }
       }
 
@@ -2309,6 +2449,8 @@ document.body.addEventListener('click', function (event) {
       themeName: universel_themeName,
       shop: universel_shop,
       selectors: {
+        themeId: universel_themeId,
+        shop: window.Shopify.shop,
         salePriceClassOrId: universel_regularPriceClassOrId,
         comparePriceClassOrId: universel_comparePriceClassOrId,
         priceContainer: universel_productPriceContainer,
@@ -2320,12 +2462,16 @@ document.body.addEventListener('click', function (event) {
         textClassOrId: universel_textClassOrId,
         contentContainer: universel_contentContainer,
         imgClassOrId: universel_imgClassOrId,
+        singleImgClassOrId: universel_singleImgClassOrId,
         imageContainer: universel_imageContainer,
+        singleProductImageContainer: universel_singleProductImageContainer,
         triggerButtonClassOrId: universel_triggerButtonClassOrId,
         searchClassOrId: universel_searchClassOrId,
         modalClassOrId: universel_modalClassOrId,
         triggerButtonContainer: universel_triggerButtonContainer,
-        triggerElementContainer: universel_triggerElementContainer
+        triggerElementContainer: universel_triggerElementContainer,
+        searchItemLink: universel_searchItemLink,
+        searchImage: universel_searchImage
       }
     }
 
@@ -3510,7 +3656,7 @@ function universel_enableImagePickerForOthers() {
 
         universel_targetImage = target
 
-        universel_imageEl = buildSelectorFromHierarchy(combinedInfo)
+        universel_singleImgEl = buildSelectorFromHierarchy(combinedInfo)
         universel_renderModal()
         // updatePricesForPage()
         universel_updateButtonStates()
@@ -4554,6 +4700,70 @@ document.body.addEventListener('click', function (event) {
       universel_targetSearch = input
       input.addEventListener('input', (e) => {
         console.log(`⌨️ User typed: "${e.target.value}"`)
+        console.log(
+          'triggerElementContainer',
+          universel_triggerElementContainer
+        )
+        if (universel_triggerElementContainer) {
+          universel_triggerElementContainer.forEach((selector) => {
+            const inputEl = document.querySelector(selector)
+            console.log('inputField', inputEl)
+            if (inputEl) {
+              // 1. Get the class name(s) of inputEl
+              const inputElClass = inputEl.className // string, e.g. "search-modal__form some-other-class"
+
+              console.log('inputEl class:', inputElClass)
+
+              // 2. Use class selector to find the element again
+              // Build selector by prefixing each class with '.' and joining
+              const classSelector = inputElClass
+                .split(' ')
+                .filter(Boolean)
+                .map((cls) => '.' + cls)
+                .join('')
+
+              // 3. Query the element by class selector
+              console.log('classSelector', classSelector)
+              setTimeout(() => {
+                if (classSelector) {
+                  const aTag = document
+                    .querySelector(classSelector)
+                    .querySelector('a')
+                  const imgTag = document
+                    .querySelector(classSelector)
+                    .querySelector('img')
+
+                  const aClass = aTag?.className || null
+                  const imgClass = imgTag?.className || null
+
+                  if (aClass) {
+                    if (!universel_searchItemLink.includes(aClass)) {
+                      universel_searchLinkEl = aClass
+                      universel_searchItemLink.push(universel_searchLinkEl)
+                    }
+                  }
+
+                  if (imgClass) {
+                    if (!universel_searchImage.includes(imgClass)) {
+                      universel_searchImgEl = imgClass
+                      universel_searchImage.push(universel_searchImgEl)
+                    }
+                  }
+
+                  console.log('Anchor class:', universel_searchLinkEl)
+                  console.log('Image class:', universel_searchImgEl)
+                } else {
+                  console.warn(
+                    'No element found with class selector:',
+                    classSelector
+                  )
+                }
+              }, 1000)
+            } else {
+              console.warn('No element found for selector:', selector)
+            }
+          })
+        }
       })
       input.addEventListener('focus', () => {
         console.log('🔎 Input focused.')

@@ -37,6 +37,10 @@ let searchClassOrId = []
 let modalClassOrId = []
 let triggerButtonContainer = []
 let triggerElementContainer = []
+let singleImgClassOrId = []
+let singleProductImageContainer = []
+let searchItemLink = []
+let searchImage = []
 const PAYLOAD_KEY = 'signal_test_info'
 const ACTIVE_KEY = 'signal_selector_info'
 let activeTab = null
@@ -128,7 +132,7 @@ function showModalIfAllowed() {
 
   parsedPayload = JSON.parse(storedPayload)
   if (
-    referrerUrl === 'https://admin.testsignal.com/' ||
+    referrerUrl === 'https://admin.testsignal.com' ||
     parsedPayload.appName === 'Signal'
   ) {
     console.log('✅ Showing modal...')
@@ -245,6 +249,19 @@ async function fetchSelector() {
       })
       selectors?.addtocartSelector?.forEach((atc) => {
         addtocartSelector.push(atc)
+      })
+      selectors?.singleImgClassOrId?.forEach((sis) => {
+        singleImgClassOrId.push(sis)
+        universel_singleImgEl = sis
+      })
+      selectors?.singleProductImageContainer?.forEach((spic) => {
+        singleProductImageContainer.push(spic)
+      })
+      selectors?.searchItemLink?.forEach((sil) => {
+        searchItemLink.push(sil)
+      })
+      selectors?.searchImage?.forEach((si) => {
+        searchImage.push(si)
       })
       badgeOrginalText = selectors?.badgeOrginalText
 
@@ -1662,6 +1679,8 @@ document.body.addEventListener('click', function (event) {
       themeName: themeName,
       shop: class_shop,
       selectors: {
+        themeId: themeId,
+        shop: window.Shopify.shop,
         salePriceClassOrId: regularPriceClassOrId,
         comparePriceClassOrId: comparePriceClassOrId,
         priceContainer: productPriceContainer,
@@ -1678,13 +1697,17 @@ document.body.addEventListener('click', function (event) {
         searchClassOrId: searchClassOrId,
         modalClassOrId: modalClassOrId,
         triggerButtonContainer: triggerButtonContainer,
-        triggerElementContainer: triggerElementContainer
+        triggerElementContainer: triggerElementContainer,
+        singleImgClassOrId: singleImgClassOrId,
+        singleProductImageContainer: singleProductImageContainer,
+        searchItemLink: searchItemLink,
+        searchImage: searchImage
       }
     }
 
     console.log('payload', payload)
 
-    // fetch('http://localhost:5001/api/v1/app/selector', {
+    // fetch("http://localhost:5001/api/v1/app/selector", {
     fetch('https://api.testsignal.com/api/v1/app/selector', {
       method: 'POST',
       headers: {

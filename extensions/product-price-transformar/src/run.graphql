@@ -20,6 +20,17 @@ query RunInput {
           }
         }
       }
+      sellingPlanAllocation {
+        priceAdjustments {
+          price {
+            amount
+            currencyCode
+          }
+        }
+        sellingPlan {
+          id
+        }
+      }
     }
   }
 }
