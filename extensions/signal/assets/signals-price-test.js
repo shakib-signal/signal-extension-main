@@ -840,6 +840,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   function getVariantId(input = null) {
     // If input is provided, try to get variant ID directly from it
+
     if (input) {
       const isRadio = input.type === 'radio' && input.name
       if (isRadio) {
@@ -882,30 +883,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // change handler
   const variantHandler = (event) => {
-    const productContainer = document.querySelector(
+    const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
     if (productContainer) {
-      const priceElements = findPriceElements(productContainer)
-      hidePriceElements(priceElements)
+      for (const container of productContainer) {
+        const priceElements = findPriceElements(container)
+        hidePriceElements(priceElements)
+      }
     }
 
     try {
       // sellingPlanHandler(event)
       const variantInput = event.target.closest(
-        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
+        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
-
       // Update prices after a short delay to allow variant changes to complete
       setTimeout(() => {
         try {
           if (variantInput) {
             const variantId = getVariantId(variantInput)
             updateSingleProductPrice(variantId)
+
             waitForProductPriceAndRun()
           } else {
             const variantId = getIdFromCartForm(event)
             updateSingleProductPrice(variantId)
+
             waitForProductPriceAndRun()
           }
         } catch (error) {
@@ -1104,7 +1108,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const matchedProduct = products
       .filter((p) => p?.experimentType == 'price_testing')
       .find((product) => {
+        console.log({
+          pv: product.variantId,
+          pn: product.variantName,
+          variantId
+        })
         return product.variantId == variantId
+          ? true
+          : product.variantName == variantId
       })
 
     if (!matchedProduct) {
@@ -1113,13 +1124,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       return
     }
 
-    let { price, compareAtPrice, discountAmount, discountPercentage } =
+    const { price, compareAtPrice, discountAmount, discountPercentage } =
       matchedProduct
 
-    const productContainer = document.querySelector(
+    const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
-
+    console.log({ productContainer })
     if (!productContainer) return
 
     // if (sellingObj?.isToggleOn) {
@@ -1127,15 +1138,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // }
 
     // Find and update price elements
-    const priceElements = findPriceElements(productContainer)
-    hidePriceElements(priceElements)
-    updatePriceElements(
-      priceElements,
-      price,
-      compareAtPrice,
-      discountAmount,
-      discountPercentage
-    )
+    for (const container of productContainer) {
+      const priceElements = findPriceElements(container)
+      hidePriceElements(priceElements)
+      updatePriceElements(
+        priceElements,
+        price,
+        compareAtPrice,
+        discountAmount,
+        discountPercentage
+      )
+    }
   }
   const sortCatalogProducts = () => {
     const groupedByHandle = {}
@@ -1237,9 +1250,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const variantFromURL = urlParams.get('variant')
       let variantId = variantFromURL ?? firstVariant_product
       updateSingleProductPrice(variantId)
-    } else {
-      updateProductPricesOnCard()
     }
+    setTimeout(() => {
+      updateProductPricesOnCard()
+    }, 1600)
   }
 
   // finding single product path
