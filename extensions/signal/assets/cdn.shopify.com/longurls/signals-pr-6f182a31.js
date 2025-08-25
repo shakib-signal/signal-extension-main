@@ -792,13 +792,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
     }
     // Find all badges
+    // for (const selector of possibleSelectors.badges) {
+    //   const elements = container.querySelectorAll(selector)
+    //   elements.forEach((element) => {
+    //     if (element) {
+    //       foundElements.badges.push(element)
+    //     }
+    //   })
+    // }
     for (const selector of possibleSelectors.badges) {
       const elements = container.querySelectorAll(selector)
-      elements.forEach((element) => {
+
+      for (const element of elements) {
         if (element) {
           foundElements.badges.push(element)
+          break // stop after first found element
         }
-      })
+      }
+
+      if (foundElements.badges.length > 0) {
+        break // stop checking other selectors
+      }
     }
 
     return foundElements
@@ -877,7 +891,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      sellingPlanHandler(event)
+      // sellingPlanHandler(event)
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
       )
@@ -952,8 +966,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const updateBadgeText = (text, newValue) => {
+      const cleanedText = text.replace(/\$/g, '').trim()
       const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
-      const match = text.match(pattern)
+      const match = cleanedText.match(pattern)
 
       if (match) {
         const [, beforeText, , afterText] = match
@@ -1017,6 +1032,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
 
     // Update all badges
+    console.log('priceElements.badges', priceElements.badges)
     priceElements.badges.forEach((badgeEl) => {
       const badgeText = badgeEl.textContent?.trim()
       if (!badgeText) return
@@ -1024,15 +1040,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const hasPercentage = badgeText.includes('%')
       const hasPrice =
         /[a-zA-Z]*\d+\.?\d*/.test(badgeText) && !badgeText.includes('%')
-
+      if (badgeEl.dataset.updated) return
       if (hasPercentage) {
         const newText = `${discountPercentage}%`
         badgeEl.textContent = updateBadgeText(badgeText, newText)
+        badgeEl.dataset.updated = 'true'
       } else if (hasPrice) {
         const newText = formatedPriceWithCurrency(
           parseFloat(discountAmount) * 100
         )
         badgeEl.textContent = updateBadgeText(badgeText, newText)
+        badgeEl.dataset.updated = 'true'
       }
     })
 
@@ -1102,13 +1120,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
     )
-    console.log('sellingObj', sellingObj)
 
     if (!productContainer) return
 
-    if (sellingObj?.isToggleOn) {
-      price = subscribeSellingPlane(matchedProduct, price, products, variantId)
-    }
+    // if (sellingObj?.isToggleOn) {
+    //   price = subscribeSellingPlane(matchedProduct, price, products, variantId)
+    // }
 
     // Find and update price elements
     const priceElements = findPriceElements(productContainer)
@@ -1212,7 +1229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       revealAllHiddenClasses()
       return
     }
-    sellingPlanHandler()
+    // sellingPlanHandler()
     if (variantId) {
       // On product page, try to update single product price first
       updateSingleProductPrice(variantId)
@@ -3009,20 +3026,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       consoleLog('No cart drawer found. Proceeding with default.')
     }
   }
-  function attachSellingPlan(lineId, sellingPlanId) {
-    fetch('/cart/change.js', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        line: lineId, // the cart line key from previous step
-        selling_plan: sellingPlanId
-      })
-    })
-      .then((res) => res.json())
-      .then((updatedCart) => {
-        console.log('Selling plan attached, discount applied', updatedCart)
-      })
-  }
 
   function handleAddToCart(event, form) {
     const variantSelect = form.querySelector(
@@ -3117,22 +3120,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       })
     })
-      .then(async (response) => {
-        const cart = await response.json()
+      .then(async () => {
         await handleCartDrawerUpdate()
-
-        // Handle selling plan attachment if enabled
-        if (sellingObj?.isToggleOn && sellingObj?.value) {
-          // Find the line item that was just added (usually the last one)
-          const lastItem = cart.items[cart.items.length - 1]
-          if (lastItem) {
-            attachSellingPlan(lastItem.key, sellingObj.value)
-          }
-        }
       })
       .catch((error) => {
         console.error('Error adding to cart:', error)
-        // form.submit()
+        form.submit()
       })
       .finally(() => {
         addButton?.classList.remove('is-loading', 'app-loading-white')

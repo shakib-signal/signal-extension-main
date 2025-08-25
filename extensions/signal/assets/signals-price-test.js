@@ -792,13 +792,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
     }
     // Find all badges
+    // for (const selector of possibleSelectors.badges) {
+    //   const elements = container.querySelectorAll(selector)
+    //   elements.forEach((element) => {
+    //     if (element) {
+    //       foundElements.badges.push(element)
+    //     }
+    //   })
+    // }
     for (const selector of possibleSelectors.badges) {
       const elements = container.querySelectorAll(selector)
-      elements.forEach((element) => {
+
+      for (const element of elements) {
         if (element) {
           foundElements.badges.push(element)
+          break // stop after first found element
         }
-      })
+      }
+
+      if (foundElements.badges.length > 0) {
+        break // stop checking other selectors
+      }
     }
 
     return foundElements
@@ -952,8 +966,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const updateBadgeText = (text, newValue) => {
+      const cleanedText = text.replace(/\$/g, '').trim()
       const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
-      const match = text.match(pattern)
+      const match = cleanedText.match(pattern)
 
       if (match) {
         const [, beforeText, , afterText] = match
@@ -1017,6 +1032,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
 
     // Update all badges
+    console.log('priceElements.badges', priceElements.badges)
     priceElements.badges.forEach((badgeEl) => {
       const badgeText = badgeEl.textContent?.trim()
       if (!badgeText) return
@@ -1024,15 +1040,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       const hasPercentage = badgeText.includes('%')
       const hasPrice =
         /[a-zA-Z]*\d+\.?\d*/.test(badgeText) && !badgeText.includes('%')
-
+      if (badgeEl.dataset.updated) return
       if (hasPercentage) {
         const newText = `${discountPercentage}%`
         badgeEl.textContent = updateBadgeText(badgeText, newText)
+        badgeEl.dataset.updated = 'true'
       } else if (hasPrice) {
         const newText = formatedPriceWithCurrency(
           parseFloat(discountAmount) * 100
         )
         badgeEl.textContent = updateBadgeText(badgeText, newText)
+        badgeEl.dataset.updated = 'true'
       }
     })
 
