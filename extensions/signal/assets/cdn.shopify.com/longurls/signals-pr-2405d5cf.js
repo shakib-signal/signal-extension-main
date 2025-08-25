@@ -1032,7 +1032,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
 
     // Update all badges
-    console.log('priceElements.badges', priceElements.badges)
     priceElements.badges.forEach((badgeEl) => {
       const badgeText = badgeEl.textContent?.trim()
       if (!badgeText) return
@@ -1040,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const hasPercentage = badgeText.includes('%')
       const hasPrice =
         /[a-zA-Z]*\d+\.?\d*/.test(badgeText) && !badgeText.includes('%')
-      if (badgeEl.dataset.updated) return
+      // if (badgeEl.dataset.updated) return
       if (hasPercentage) {
         const newText = `${discountPercentage}%`
         badgeEl.textContent = updateBadgeText(badgeText, newText)
