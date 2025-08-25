@@ -1086,7 +1086,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       (plan) => plan?.id?.split('/').pop() === selectedPlanId
     )
     const sellingDiscount = selectedSellingPlan?.percentage
-    console.log({ sellingDiscount })
 
     const price = sellingDiscount
       ? testPrice - (testPrice * sellingDiscount) / 100
@@ -1108,11 +1107,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const matchedProduct = products
       .filter((p) => p?.experimentType == 'price_testing')
       .find((product) => {
-        console.log({
-          pv: product.variantId,
-          pn: product.variantName,
-          variantId
-        })
         return product.variantId == variantId
           ? true
           : product.variantName == variantId
@@ -1130,7 +1124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
-    console.log({ productContainer })
     if (!productContainer) return
 
     // if (sellingObj?.isToggleOn) {
