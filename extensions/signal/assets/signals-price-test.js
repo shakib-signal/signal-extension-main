@@ -877,7 +877,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      sellingPlanHandler(event)
+      // sellingPlanHandler(event)
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked'
       )
@@ -1102,13 +1102,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productContainer = document.querySelector(
       possibleSelectors.singleProductContainer.join(',')
     )
-    console.log('sellingObj', sellingObj)
 
     if (!productContainer) return
 
-    if (sellingObj?.isToggleOn) {
-      price = subscribeSellingPlane(matchedProduct, price, products, variantId)
-    }
+    // if (sellingObj?.isToggleOn) {
+    //   price = subscribeSellingPlane(matchedProduct, price, products, variantId)
+    // }
 
     // Find and update price elements
     const priceElements = findPriceElements(productContainer)
@@ -1212,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       revealAllHiddenClasses()
       return
     }
-    sellingPlanHandler()
+    // sellingPlanHandler()
     if (variantId) {
       // On product page, try to update single product price first
       updateSingleProductPrice(variantId)
