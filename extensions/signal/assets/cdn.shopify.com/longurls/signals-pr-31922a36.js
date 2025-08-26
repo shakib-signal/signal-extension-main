@@ -881,10 +881,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     return sellingObj
   }
+
+  const updateVariantPriceOnCard = (variantInput) => {
+    const productContainer = variantInput.closest(
+      possibleSelectors.productCardContainer.join(',')
+    )
+    if (!productContainer) return
+    const variantValue = variantInput.value
+    const matchingVariant = products.find((product) => {
+      return (
+        // product.productHandle === productHandle &&
+        product.variantName === variantValue
+      )
+    })
+    if (!matchingVariant) {
+      consoleLog(
+        `No matching variant found for ${productHandle} - ${variantValue}`
+      )
+      return
+    }
+    const {
+      price: variantPrice,
+      compareAtPrice: variantCompareAtPrice,
+      discountAmount: variantDiscountAmount,
+      discountPercentage: variantDiscountPercentage
+    } = matchingVariant
+    const priceElements = findPriceElements(productContainer)
+    updatePriceElements(
+      priceElements,
+      variantPrice,
+      variantCompareAtPrice,
+      variantDiscountAmount,
+      variantDiscountPercentage
+    )
+  }
   // change handler
   const variantHandler = (event) => {
     const productContainer = document.querySelectorAll(
-      possibleSelectors.singleProductContainer.join(',')
+      [
+        ...possibleSelectors.singleProductContainer,
+        ...possibleSelectors.productCardContainer
+      ].join(',')
     )
     if (productContainer) {
       for (const container of productContainer) {
@@ -902,6 +939,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => {
         try {
           if (variantInput) {
+            updateVariantPriceOnCard(variantInput)
             const variantId = getVariantId(variantInput)
             updateSingleProductPrice(variantId)
 
@@ -930,6 +968,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const priceText = formatedPriceWithCurrency(parseFloat(price) * 100)
     priceEl.textContent = priceText
+
     return priceEl
   }
 
@@ -1086,7 +1125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       (plan) => plan?.id?.split('/').pop() === selectedPlanId
     )
     const sellingDiscount = selectedSellingPlan?.percentage
-    console.log({ sellingDiscount })
 
     const price = sellingDiscount
       ? testPrice - (testPrice * sellingDiscount) / 100
@@ -1108,11 +1146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const matchedProduct = products
       .filter((p) => p?.experimentType == 'price_testing')
       .find((product) => {
-        console.log({
-          pv: product.variantId,
-          pn: product.variantName,
-          variantId
-        })
         return product.variantId == variantId
           ? true
           : product.variantName == variantId
@@ -1130,7 +1163,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
-    console.log({ productContainer })
     if (!productContainer) return
 
     // if (sellingObj?.isToggleOn) {
@@ -1167,6 +1199,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const lowestPriceVariants = Object.values(groupedByHandle)
     return lowestPriceVariants
+  }
+  const updateVariantPricesOnCard = (productContainer, productHandle) => {
+    // Update variant prices on this specific card
+    const variantLabels = productContainer.querySelectorAll('.js-label-option')
+    // productContainer.querySelectorAll('.js-option-price')
+
+    variantLabels.forEach((variantLabel) => {
+      const input = variantLabel.querySelector('input[type="radio"]')
+      if (!input) return
+
+      const variantValue = input.value // e.g., "50 mL", "100 mL"
+
+      // Find matching product variant for this specific variant
+      const matchingVariant = products.find((product) => {
+        return (
+          product.productHandle === productHandle &&
+          product.variantName === variantValue
+        )
+      })
+
+      if (!matchingVariant) {
+        consoleLog(
+          `No matching variant found for ${productHandle} - ${variantValue}`
+        )
+        return
+      }
+
+      const {
+        price: variantPrice,
+        compareAtPrice: variantCompareAtPrice,
+        discountAmount: variantDiscountAmount,
+        discountPercentage: variantDiscountPercentage
+      } = matchingVariant
+
+      // Update the variant price span directly
+      if (variantPrice) {
+        const formattedPrice = formatedPriceWithCurrency(
+          parseFloat(variantPrice) * 100
+        )
+        const priceSpan = variantLabel.querySelector('.js-option-price')
+        priceSpan.textContent = formattedPrice
+
+        // Update data attributes if they exist
+        if (priceSpan.dataset.originalPrice) {
+          priceSpan.dataset.originalPrice = formattedPrice
+        }
+
+        consoleLog(
+          `Updated variant price for ${productHandle} - ${variantValue}: ${formattedPrice}`
+        )
+      }
+    })
   }
   function updateProductPricesOnCard() {
     if (!products || !products.length) {
@@ -1224,6 +1308,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           // Find and update price elements
           const priceElements = findPriceElements(productContainer)
 
+          // Update main product price
           updatePriceElements(
             priceElements,
             price,
@@ -1231,6 +1316,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             discountAmount,
             discountPercentage
           )
+          updateVariantPricesOnCard(productContainer, productHandle)
         })
     })
   }
@@ -1250,10 +1336,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const variantFromURL = urlParams.get('variant')
       let variantId = variantFromURL ?? firstVariant_product
       updateSingleProductPrice(variantId)
-    }
-    setTimeout(() => {
+    } else {
       updateProductPricesOnCard()
-    }, 1600)
+    }
   }
 
   // finding single product path
@@ -2801,54 +2886,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   // onVariantUrlChange(updateHydrozenThemePrices)
 
   // Add click handler for product links
-  document.addEventListener('click', (event) => {
-    const productLink = event.target.closest('a[href*="/products/"]')
-    if (productLink) {
-      const url = new URL(productLink.href)
-      const variantId = url.searchParams.get('variant')
-      if (variantId) {
-        // Store the variant ID in sessionStorage for the product page
-        const productHandle = productLink.href
-          .split('/products/')[1]
-          .split('?')[0]
-        sessionStorage.setItem(`selected_variant_${productHandle}`, variantId)
-      }
-    }
-  })
-  const target = document.querySelector('product-price')
+  // document.addEventListener('click', (event) => {
+  //   const productLink = event.target.closest('a[href*="/products/"]')
+  //   if (productLink) {
+  //     const url = new URL(productLink.href)
+  //     const variantId = url.searchParams.get('variant')
+  //     if (variantId) {
+  //       // Store the variant ID in sessionStorage for the product page
+  //       const productHandle = productLink.href
+  //         .split('/products/')[1]
+  //         .split('?')[0]
+  //       sessionStorage.setItem(`selected_variant_${productHandle}`, variantId)
+  //     }
+  //   }
+  // })
+  // const target = document.querySelector('product-price')
 
-  const newThemeObserver = new MutationObserver(() => {
-    newThemeObserver.disconnect()
-    // Replace inner HTML
-    updateProductPricesOnCard()
-  })
-  if (target) {
-    newThemeObserver.observe(target, { childList: true, subtree: true })
-  }
+  // const newThemeObserver = new MutationObserver(() => {
+  //   newThemeObserver.disconnect()
+  //   // Replace inner HTML
+  //   updateProductPricesOnCard()
+  // })
+  // if (target) {
+  //   newThemeObserver.observe(target, { childList: true, subtree: true })
+  // }
 
   // Check for stored variant on product page load
-  document.addEventListener('DOMContentLoaded', () => {
-    const productHandle = window.location.pathname
-      .split('/products/')[1]
-      ?.split('?')[0]
-    if (productHandle) {
-      const storedVariantId = sessionStorage.getItem(
-        `selected_variant_${productHandle}`
-      )
-      if (storedVariantId) {
-        // Find and select the variant
-        const variantInput = document.querySelector(
-          `input[name="id"][value="${storedVariantId}"]`
-        )
-        if (variantInput) {
-          variantInput.checked = true
-          variantInput.dispatchEvent(new Event('change'))
-        }
-        // Clear the stored variant
-        sessionStorage.removeItem(`selected_variant_${productHandle}`)
-      }
-    }
-  })
+  // document.addEventListener('DOMContentLoaded', () => {
+  //   const productHandle = window.location.pathname
+  //     .split('/products/')[1]
+  //     ?.split('?')[0]
+  //   if (productHandle) {
+  //     const storedVariantId = sessionStorage.getItem(
+  //       `selected_variant_${productHandle}`
+  //     )
+  //     if (storedVariantId) {
+  //       // Find and select the variant
+  //       const variantInput = document.querySelector(
+  //         `input[name="id"][value="${storedVariantId}"]`
+  //       )
+  //       if (variantInput) {
+  //         variantInput.checked = true
+  //         variantInput.dispatchEvent(new Event('change'))
+  //       }
+  //       // Clear the stored variant
+  //       sessionStorage.removeItem(`selected_variant_${productHandle}`)
+  //     }
+  //   }
+  // })
 
   // Add change event listener for both select elements
   // document
@@ -3142,6 +3227,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
       .finally(() => {
         addButton?.classList.remove('is-loading', 'app-loading-white')
+        const variantButtons = document.querySelectorAll('.app-loading')
+        if (variantButtons) {
+          variantButtons.forEach((button) => {
+            button.classList.remove('app-loading')
+          })
+        }
       })
   }
 
@@ -3182,7 +3273,72 @@ document.addEventListener('DOMContentLoaded', async () => {
     .forEach(setupAddToCartButton)
 
   // Watch for dynamically added forms
-  const observer = new MutationObserver((mutations) => {
+  // Flag to prevent infinite loops when updating prices
+  // let isUpdatingPrices = false
+
+  // const observer = new MutationObserver((mutations) => {
+  //   // Skip if we're already updating prices to prevent loops
+  //   if (isUpdatingPrices) return
+
+  //   let shouldUpdatePrices = false
+
+  //   mutations.forEach((mutation) => {
+  //     // Skip if this mutation is from our price updates
+  //     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+  //       const hasPriceUpdates = Array.from(mutation.addedNodes).some(
+  //         (node) =>
+  //           node.nodeType === 1 && node.classList?.contains('js-option-price')
+  //       )
+  //       if (hasPriceUpdates) return
+  //     }
+
+  //     mutation.addedNodes.forEach((node) => {
+  //       if (node.nodeType === 1) {
+  //         // Check if the added node contains product cards or is a product card
+  //         const hasProductCards =
+  //           node.matches &&
+  //           (node.matches('a[href*="/products/"]') ||
+  //             (possibleSelectors.productCardContainer.length > 0 &&
+  //               possibleSelectors.productCardContainer.some((selector) =>
+  //                 node.matches(selector)
+  //               )))
+
+  //         if (hasProductCards) {
+  //           shouldUpdatePrices = true
+  //           console.log(
+  //             'Product cards detected in DOM changes, will update prices'
+  //           )
+  //         }
+
+  //         // Check if the added node is a form (for add to cart functionality)
+  //         if (node.matches && node.matches('form[action*="/cart/add"]')) {
+  //           setupAddToCartButton(node)
+  //         }
+  //         // Check for forms inside the added node
+  //         if (node.querySelectorAll) {
+  //           node
+  //             .querySelectorAll('form[action*="/cart/add"]')
+  //             .forEach(setupAddToCartButton)
+  //         }
+  //       }
+  //     })
+  //   })
+
+  //   // Only update prices if product cards were actually added
+  //   if (shouldUpdatePrices) {
+  //     console.log('Updating prices due to new product cards')
+  //     isUpdatingPrices = true
+
+  //     updateProductPricesOnCard()
+  //   }
+  //   setTimeout(() => {
+  //     revelAllHiddenPrices()
+  //     isUpdatingPrices = false
+  //   }, 600)
+  // })
+
+  // old
+  const observerX = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType === 1) {
@@ -3204,10 +3360,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
     })
   })
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // 1) New product cards added
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return // skip text etc.
+
+          // ✅ only run if it's a whole product card (adjust selector)
+          if (node.matches(possibleSelectors.productCardContainer.join(','))) {
+            console.log('📦 New product card added', node)
+
+            updateProductPricesOnCard(node) // pass the card
+
+            // setup add-to-cart on forms inside this card
+            if (node.matches('form[action*="/cart/add"]')) {
+              setupAddToCartButton(node)
+            }
+            node
+              .querySelectorAll('form[action*="/cart/add"]')
+              .forEach(setupAddToCartButton)
+          }
+        })
+      }
+
+      // 2) Existing card DOM changes (like price update)
+      // if (
+      //   mutation.type === 'characterData' ||
+      //   (mutation.type === 'attributes' &&
+      //     mutation.target.classList.contains('js-option-price'))
+      // ) {
+      //   return
+      // }
+    })
+    setTimeout(revelAllHiddenPrices, 600)
+  })
 
   // Start observing the document
   observer.observe(document.body, {
     childList: true,
     subtree: true
+    // characterData: true,
+    // attributes: true
+    // attributeFilter: ['data-original-price', 'data-selling-plan-price']
   })
 })
