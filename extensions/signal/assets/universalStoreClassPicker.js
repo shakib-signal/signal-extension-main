@@ -3777,7 +3777,7 @@ function universel_enableCatalogImageSelection() {
   universel_fixZIndex()
 
   const catalogImages = document.querySelectorAll(
-    '.card__media img, .product-media__image'
+    '.card__media img, .product-media__image, picture img'
   )
 
   console.log(`Found ${catalogImages.length} catalog images.`)
@@ -4007,7 +4007,7 @@ function universel_enableCatalogImageSelection() {
 
     // Find all images inside .card__media
     const imgs = card.querySelectorAll(
-      '.card__media img, .product-media__image'
+      '.card__media img, .product-media__image, picture img'
     )
 
     // Remove previously selected highlights from all images
@@ -4043,7 +4043,7 @@ function universel_disableCatalogImageSelection() {
   universel_removeFixZIndex()
 
   const catalogImages = document.querySelectorAll(
-    '.card__media img[data-ig-selectable="true"], .product-media__image[data-ig-selectable="true"]'
+    '.card__media img[data-ig-selectable="true"], .product-media__image[data-ig-selectable="true"], picture img[data-ig-selectable="true"]'
   )
   console.log(`Found ${catalogImages.length} selectable images.`)
 

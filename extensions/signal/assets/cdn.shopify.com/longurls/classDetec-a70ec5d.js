@@ -57,6 +57,26 @@ let selected_variant_name = null
 //     return; // Exit early if the other script is active
 // }
 
+// const detectorStyle = document.createElement('style')
+// detectorStyle.innerHTML = `
+//   .signalDetector-hide-price {
+//     visibility: hidden !important;
+//     opacity: 0 !important;
+//     transition: opacity 0.3s ease-out;
+//   }
+
+//   .signalDetector-hide-container {
+//     visibility: hidden !important;
+//     opacity: 0 !important;
+//     transition: opacity 0.3s ease;
+//   }
+//   .signalDetector-fade-in {
+//   visibility: visible !important;
+//   opacity: 1 !important;
+// }
+// `
+// document.head.appendChild(detectorStyle)
+
 async function getDataFromUrl() {
   const url = new URL(window.location.href)
   referrerUrl = document.referrer
@@ -3314,44 +3334,38 @@ document.body.addEventListener('click', (e) => {
 })
 
 // anti-flicker function
-function hidePriceElements(priceElements) {
-  if (!priceElements) return
-  ;['compare', 'sale', 'badges'].forEach((type) => {
-    const value = priceElements[type]
-    if (!value) return
-    // If it's a NodeList or Array, loop through
-    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
-      value.forEach((el) => {
-        el.classList.add('signal-hide-price')
-      })
-    } else if (value instanceof Element) {
-      // It's a single DOM element (e.g., container)
-      value.classList.add('signal-hide-price')
-    }
-  })
-}
-// Utility to reveal specific price elements
-function revealPriceElements(priceElements) {
-  if (!priceElements) return
-  ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
-    const value = priceElements[type]
-    if (!value) return
-    const reveal = (el) => {
-      // Step 1: Add fade-in class (which makes it visible + opacity 1)
-      el.classList.add('signal-fade-in')
-      // Step 2: Wait for transition, then remove the hidden class
-      setTimeout(() => {
-        el.classList.remove('signal-hide-price')
-        el.classList.remove('signal-fade-in') // optional, if you want a clean DOM
-      }, 400) // match your transition duration
-    }
-    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
-      value.forEach(reveal)
-    } else if (value instanceof Element) {
-      reveal(value)
-    }
-  })
-}
+// function hidePriceElementsFromDetector(priceElements) {
+//   if (!priceElements) return
+//   ;['compare', 'sale', 'badges'].forEach((type) => {
+//     const value = priceElements[type]
+//     if (!value) return
+//     // If it's a NodeList or Array, loop through
+//     if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+//       value.forEach((el) => {
+//         el.classList.add('signalDetector-hide-price')
+//       })
+//     } else if (value instanceof Element) {
+//       // It's a single DOM element (e.g., container)
+//       value.classList.add('signalDetector-hide-price')
+//     }
+//   })
+// }
+// // Utility to reveal specific price elements
+// function revealPriceElementsFromDetector(priceElement) {
+//   if (!priceElement) return
+//   const reveal = (el) => {
+//     // Step 1: Add fade-in class (which makes it visible + opacity 1)
+//     el.classList.add('signalDetector-fade-in')
+//     // Step 2: Wait for transition, then remove the hidden class
+//     setTimeout(() => {
+//       el.classList.remove('signalDetector-hide-price')
+//       el.classList.remove('signalDetector-fade-in') // optional, if you want a clean DOM
+//     }, 400) // match your transition duration
+//   }
+//   if (priceElement instanceof Element) {
+//     reveal(priceElement)
+//   }
+// }
 
 function getProductInfoFromElement(el, inputId) {
   // console.log('el', el)
@@ -3500,8 +3514,6 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
   if (!elements.length) return
 
-  hidePriceElements(elements)
-
   elements.forEach((el) => {
     let inputId
     if (!isbadge) {
@@ -3637,7 +3649,6 @@ function safelyUpdatePrice(el, formattedPrice, isbadge, attempt = 0) {
   if (document.body.contains(el)) {
     updatedDom.push(el)
     el.innerText = formattedPrice
-    revealPriceElements(el)
     if (!isbadge) {
       if (highlightCheckbox) {
         el.style.color = '#1D4ED8'
@@ -3676,7 +3687,7 @@ function highlightChange(element) {
 
 document
   .querySelectorAll(
-    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"]'
+    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"],.js-product-option'
   )
   .forEach((select) => {
     select.addEventListener('change', () => {
@@ -3688,7 +3699,7 @@ document
         setTimeout(() => {
           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
           if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
-        }, 1000) // 600ms is a safe delay for themes like Horizon
+        }, 600) // 600ms is a safe delay for themes like Horizon
       }
     })
   })
