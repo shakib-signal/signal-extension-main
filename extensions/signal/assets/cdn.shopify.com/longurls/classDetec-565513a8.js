@@ -49,6 +49,7 @@ let updatedDom = []
 let landingUrl = ''
 let PRODUCT_HANDLE = 'selected_product'
 let class_shop = window.Shopify.shop
+let selected_variant_name = null
 
 // Add this at the top of the file, after variable declarations
 // if (sessionStorage.getItem(ACTIVE_KEY)) {
@@ -3523,7 +3524,9 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
       if (window.location.pathname.includes('/products/')) {
         // If variantId exists, only match by variant
-        if (productInfo.variantId) {
+        if (selected_variant_name) {
+          return p.variantName === selected_variant_name
+        } else if (productInfo.variantId) {
           // console.log('productVariant', productInfo.variantId)
           return p.variantId === productInfo.variantId
         }
@@ -3679,7 +3682,7 @@ document
     select.addEventListener('change', () => {
       // console.log('variant change');
       if (parsedPayload?.appName === 'Signal') {
-        console.log('i am in signal')
+        selected_variant_name = select.value
 
         // Wait for theme DOM update to complete before updating price
         setTimeout(() => {
