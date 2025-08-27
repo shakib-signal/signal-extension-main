@@ -882,10 +882,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     return sellingObj
   }
 
-  const updateVariantPriceOnCard = (variantInput) => {
-    const productContainer = variantInput.closest(
-      possibleSelectors.productCardContainer.join(',')
-    )
+  const hideIndividualPriceElements = (productContainer) => {
+    const priceElements = findPriceElements(productContainer)
+    hidePriceElements(priceElements)
+  }
+
+  const updateVariantPriceOnCard = (productContainer, variantInput) => {
+    // const productContainer = variantInput.closest(
+    //   possibleSelectors.productCardContainer.join(',')
+    // )
     if (!productContainer) return
     const variantValue = variantInput.value
     const matchingVariant = products.find((product) => {
@@ -895,9 +900,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
     })
     if (!matchingVariant) {
-      consoleLog(
-        `No matching variant found for ${productHandle} - ${variantValue}`
-      )
+      consoleLog(`No matching variant found for ${variantValue}`)
       return
     }
     const {
@@ -917,21 +920,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // change handler
   const variantHandler = (event) => {
-    const productContainer = document.querySelectorAll(
-      [
-        ...possibleSelectors.singleProductContainer,
-        ...possibleSelectors.productCardContainer
-      ].join(',')
-    )
-    if (productContainer) {
-      for (const container of productContainer) {
-        const priceElements = findPriceElements(container)
-        hidePriceElements(priceElements)
-      }
-    }
+    // const productContainer = document.querySelectorAll(
+    //   [
+    //     ...possibleSelectors.singleProductContainer,
+    //     ...possibleSelectors.productCardContainer
+    //   ].join(',')
+    // )
+    // if (productContainer) {
+    //   for (const container of productContainer) {
+    //     const priceElements = findPriceElements(container)
+    //     hidePriceElements(priceElements)
+    //   }
+    // }
 
     try {
       // sellingPlanHandler(event)
+      const productContainer = event.target.closest(
+        [
+          ...possibleSelectors.singleProductContainer,
+          ...possibleSelectors.productCardContainer
+        ].join(',')
+      )
+      hideIndividualPriceElements(productContainer)
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
@@ -939,7 +949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => {
         try {
           if (variantInput) {
-            updateVariantPriceOnCard(variantInput)
+            updateVariantPriceOnCard(productContainer, variantInput)
             const variantId = getVariantId(variantInput)
             updateSingleProductPrice(variantId)
 
@@ -3369,7 +3379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // ✅ only run if it's a whole product card (adjust selector)
           if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-            console.log('📦 New product card added', node)
+            // console.log('📦 New product card added', node)
 
             updateProductPricesOnCard(node) // pass the card
 

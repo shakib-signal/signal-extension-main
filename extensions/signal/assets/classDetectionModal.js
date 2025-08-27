@@ -49,7 +49,6 @@ let updatedDom = []
 let landingUrl = ''
 let PRODUCT_HANDLE = 'selected_product'
 let class_shop = window.Shopify.shop
-let selected_variant_name = null
 
 // Add this at the top of the file, after variable declarations
 // if (sessionStorage.getItem(ACTIVE_KEY)) {
@@ -3313,6 +3312,46 @@ document.body.addEventListener('click', (e) => {
   }
 })
 
+// anti-flicker function
+function hidePriceElements(priceElements) {
+  if (!priceElements) return
+  ;['compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+    // If it's a NodeList or Array, loop through
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach((el) => {
+        el.classList.add('signal-hide-price')
+      })
+    } else if (value instanceof Element) {
+      // It's a single DOM element (e.g., container)
+      value.classList.add('signal-hide-price')
+    }
+  })
+}
+// Utility to reveal specific price elements
+function revealPriceElements(priceElements) {
+  if (!priceElements) return
+  ;['container', 'compare', 'sale', 'badges'].forEach((type) => {
+    const value = priceElements[type]
+    if (!value) return
+    const reveal = (el) => {
+      // Step 1: Add fade-in class (which makes it visible + opacity 1)
+      el.classList.add('signal-fade-in')
+      // Step 2: Wait for transition, then remove the hidden class
+      setTimeout(() => {
+        el.classList.remove('signal-hide-price')
+        el.classList.remove('signal-fade-in') // optional, if you want a clean DOM
+      }, 400) // match your transition duration
+    }
+    if (NodeList.prototype.isPrototypeOf(value) || Array.isArray(value)) {
+      value.forEach(reveal)
+    } else if (value instanceof Element) {
+      reveal(value)
+    }
+  })
+}
+
 function getProductInfoFromElement(el, inputId) {
   // console.log('el', el)
   const defaultSelectors =
@@ -3460,6 +3499,8 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
   if (!elements.length) return
 
+  hidePriceElements(elements)
+
   elements.forEach((el) => {
     let inputId
     if (!isbadge) {
@@ -3482,9 +3523,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
       if (window.location.pathname.includes('/products/')) {
         // If variantId exists, only match by variant
-        if (selected_variant_name) {
-          return p.variantName === selected_variant_name
-        } else if (productInfo.variantId) {
+        if (productInfo.variantId) {
           // console.log('productVariant', productInfo.variantId)
           return p.variantId === productInfo.variantId
         }
@@ -3595,6 +3634,7 @@ function safelyUpdatePrice(el, formattedPrice, isbadge, attempt = 0) {
   if (document.body.contains(el)) {
     updatedDom.push(el)
     el.innerText = formattedPrice
+    revealPriceElements(el)
     if (!isbadge) {
       if (highlightCheckbox) {
         el.style.color = '#1D4ED8'
@@ -3633,13 +3673,14 @@ function highlightChange(element) {
 
 document
   .querySelectorAll(
-    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"], input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
+    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"]'
   )
   .forEach((select) => {
     select.addEventListener('change', () => {
       // console.log('variant change');
       if (parsedPayload?.appName === 'Signal') {
-        selected_variant_name = select.value
+        console.log('i am in signal')
+
         // Wait for theme DOM update to complete before updating price
         setTimeout(() => {
           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)

@@ -882,10 +882,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     return sellingObj
   }
 
-  const updateVariantPriceOnCard = (variantInput) => {
-    const productContainer = variantInput.closest(
-      possibleSelectors.productCardContainer.join(',')
-    )
+  const updateVariantPriceOnCard = (productContainer, variantInput) => {
+    // const productContainer = variantInput.closest(
+    //   possibleSelectors.productCardContainer.join(',')
+    // )
     if (!productContainer) return
     const variantValue = variantInput.value
     const matchingVariant = products.find((product) => {
@@ -917,29 +917,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // change handler
   const variantHandler = (event) => {
-    const productContainer = document.querySelectorAll(
-      [
-        ...possibleSelectors.singleProductContainer,
-        ...possibleSelectors.productCardContainer
-      ].join(',')
-    )
-    if (productContainer) {
-      for (const container of productContainer) {
-        const priceElements = findPriceElements(container)
-        hidePriceElements(priceElements)
-      }
-    }
-
     try {
       // sellingPlanHandler(event)
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
+      const productContainer = event.target.closest(
+        [
+          ...possibleSelectors.singleProductContainer,
+          ...possibleSelectors.productCardContainer
+        ].join(',')
+      )
+
+      // if (productContainer) {
+      //   for (const container of productContainer) {
+      //   }
+      // }
+      const priceElements = findPriceElements(productContainer)
+      hidePriceElements(priceElements)
+
       // Update prices after a short delay to allow variant changes to complete
       setTimeout(() => {
         try {
           if (variantInput) {
-            updateVariantPriceOnCard(variantInput)
+            updateVariantPriceOnCard(productContainer, variantInput)
             const variantId = getVariantId(variantInput)
             updateSingleProductPrice(variantId)
 
