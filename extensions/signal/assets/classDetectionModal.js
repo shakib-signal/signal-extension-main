@@ -3441,11 +3441,14 @@ function getProductInfoFromElement(el, inputId) {
   const productId =
     container.getAttribute('data-product-id') ||
     container.getAttribute('data-pid')
+
   let productHandle =
     container.getAttribute('data-product-handle') ||
     container.getAttribute('data-handle')
 
-  // 🔽 Fallback: look for anchor href containing /products/
+  let selectedValue
+
+  // 🔽 Fallback 1: look for anchor href containing /products/
   if (!productHandle) {
     const anchor = container.querySelector('a[href*="/products/"]')
     if (anchor) {
@@ -3455,7 +3458,13 @@ function getProductInfoFromElement(el, inputId) {
         productHandle = match[1]
       }
     }
+
+    const selectEl = container.querySelector('select')
+    if (selectEl) {
+      selectedValue = selectEl.options[selectEl.selectedIndex].value
+    }
   }
+
   // Get variantId from URL if on a product page
   let variantId = null
   const pathname = window.location.pathname
@@ -3463,8 +3472,8 @@ function getProductInfoFromElement(el, inputId) {
   if (pathname.includes('/products/')) {
     if (!variantId) {
       variantId = urlParams.get('variant')
+    } else {
       variantId = firstVariant_product?.toString()
-      // console.log('productVariant', variantId)
     }
   }
 
@@ -3476,7 +3485,7 @@ function getProductInfoFromElement(el, inputId) {
   }
 
   if (productId || productHandle || variantId) {
-    return { productId, productHandle, variantId, container }
+    return { productId, productHandle, variantId, container, selectedValue }
   }
 
   // 6. Fallback from product link
@@ -3511,7 +3520,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
   const selectedTestGroupId = selectEl.value
   if (!selectedTestGroupId) return
 
-  console.log('selectedTestGroupId', selectedTestGroupId)
+  // console.log('selectedTestGroupId', selectedTestGroupId)
 
   const testingProducts = parsedPayload?.productInfo?.testingProducts || []
 
@@ -3541,9 +3550,9 @@ function updatePricesForPage(selector, isRegular, isbadge) {
     }
     const productInfo = getProductInfoFromElement(el, inputId)
 
-    console.log('productInfo', productInfo)
     // console.log('testingproducts', testingProducts)
     if (!productInfo) return
+    // console.log('productInfo', productInfo)
 
     const matchedProduct = testingProducts.find((p) => {
       const testGroupMatch = (p.testId || p.name) === selectedTestGroupId
@@ -3554,24 +3563,27 @@ function updatePricesForPage(selector, isRegular, isbadge) {
         // If variantId exists, only match by variant
         if (p.productId === productInfo.productId) {
           if (selected_variant_name) {
-            const productVarinat = `${p.productHandle} + "_" + ${p.variantName}`
+            // console.log('selected_variant_name', selected_variant_name)
+            const productVarinat = `${p.productHandle}_${p.variantName}`
+            // console.log('variantName', productVarinat === selected_variant_name)
             return productVarinat === selected_variant_name
           } else if (productInfo.variantId) {
-            console.log('productVariant', productInfo.variantId)
             return p.variantId === productInfo.variantId
           }
         }
       }
-
+      if (productInfo.selectedValue) {
+        return p.variantName === productInfo.selectedValue
+      }
       // Fallback to productId or handle
       return (
         p.productId === productInfo.productId ||
         p.productHandle === productInfo.productHandle
       )
     })
-    // console.log('matchedProduct', matchedProduct)
 
     if (!matchedProduct) return
+    // console.log('matchedProduct', matchedProduct)
 
     if (!isbadge) {
       const priceValue = isRegular
@@ -3584,6 +3596,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
       const formattedPrice = formatedPriceWithCurrency(
         parseFloat(priceValue) * 100
       )
+
       // console.log('el', el)
 
       safelyUpdatePrice(el, formattedPrice, false)
@@ -3597,6 +3610,8 @@ function updatePricesForPage(selector, isRegular, isbadge) {
           parseFloat(matchedProduct?.compareAtPrice)) *
           100
       )
+
+      // console.log('discountPercentage', discountPercentage)
       // console.log('badgeOrginalText', badgeOrginalText)
       // const classified = classifyLabel(badgeOrginalText)
       const badgeText = badgeOrginalText.trim()
@@ -3716,7 +3731,7 @@ document
         const selectedHandle = select.getAttribute('data-handle')
         // console.log('selectedHandle', selectedHandle)
         selected_variant_name = selectedHandle
-          ? `${selectedHandle} + "_" + ${select.value}`
+          ? `${selectedHandle}_${select.value}`
           : null
 
         // console.log('reqularEl', regularEl)
@@ -3724,8 +3739,10 @@ document
 
         // Wait for theme DOM update to complete before updating price
         setTimeout(() => {
-          if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
-          if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+          if (regularEl) updatePricesForPage(regularPriceClassOrId, true, false)
+          if (compareEl)
+            updatePricesForPage(comparePriceClassOrId, false, false)
+          if (badgeEl) updatePricesForPage(badgeClassOrId, false, true)
         }, 600) // 600ms is a safe delay for themes like Horizon
       }
     })

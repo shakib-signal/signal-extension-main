@@ -2998,17 +2998,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     return observer
   }
 
+  function clearTsSiKeys() {
+    const keysToRemove = []
+
+    // Collect matching keys first (to avoid issues while iterating)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.includes(STORAGE_PREFIX)) {
+        keysToRemove.push(key)
+      }
+    }
+
+    // Remove them
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key)
+      console.log(`🗑️ Removed localStorage key: ${key}`)
+    })
+  }
+
   // 🏁 **Run once on page load**
 
   waitForUserSession(async () => {
     try {
       const experiments = JSON.parse(signal_rules)
+      clearTsSiKeys()
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
-          localStorage.clear()
           switchTest(experiment, experiments)
         } else {
-          localStorage.clear()
           await switchTestByUser(experiment, experiments)
         }
       })
