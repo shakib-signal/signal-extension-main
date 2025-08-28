@@ -1689,10 +1689,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { testId: experiment.controlGroup, name: 'Control' }
   }
 
-  async function switchTestByUser() {
+  async function switchTestByUser(experiment, experiments) {
     const now = Date.now()
-    let experiments = JSON.parse(signal_rules) || []
-    consoleLog('experiments', experiments)
 
     let experimentFound = false
     if (experiments?.length == 0) {
@@ -1703,114 +1701,106 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
       return
     }
-    for (const experiment of experiments) {
-      if (experiment.status !== 'active') continue
+    // if (experiment.status !== 'active') return
 
-      const startDate = new Date(experiment?.startDate).getTime()
-      const endDate = new Date(experiment?.endDate).getTime()
+    const startDate = new Date(experiment?.startDate).getTime()
+    const endDate = new Date(experiment?.endDate).getTime()
 
-      const ignoreTest = () => {
-        localStorage.removeItem('signal_active_experiments')
-        removeStorage(experiment.id, 'active_ts')
-        removeStorage(experiment.id, 'last_ts_switch')
-        removeStorage(experiment.id, 'next_ts_time')
+    const ignoreTest = () => {
+      localStorage.removeItem('signal_active_experiments')
+      removeStorage(experiment.id, 'active_ts')
+      removeStorage(experiment.id, 'last_ts_switch')
+      removeStorage(experiment.id, 'next_ts_time')
 
-        const newProducts = applyTestPrices(
-          experiment,
-          experiment?.controlGroup
-        )
-        products.push(...newProducts)
-        updateProductPrices()
+      const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
+      products.push(...newProducts)
+      updateProductPrices()
+    }
+    const trouthy = endDate
+      ? now >= startDate && now <= endDate
+      : now >= startDate
+
+    if (trouthy) {
+      experimentFound = true
+      if (!isUTMAllowed(experiment)) {
+        consoleLog('%cUTM rule disabled this test. Skipping...', 'color: gray;')
+        ignoreTest()
+        return
       }
-      const trouthy = endDate
-        ? now >= startDate && now <= endDate
-        : now >= startDate
 
-      if (trouthy) {
-        experimentFound = true
-        if (!isUTMAllowed(experiment)) {
-          consoleLog(
-            '%cUTM rule disabled this test. Skipping...',
-            'color: gray;'
+      // Get or assign user to a test
+      let activeTest = getStorage(experiment.id, 'active_ts')
+      let activeTestName = getStorage(experiment.id, 'active_ts_name')
+
+      if (!activeTest) {
+        try {
+          const assignedTest = await distributeUserToTest(experiment)
+
+          activeTest = assignedTest.testId
+          activeTestName = assignedTest.name
+          const activeTestHashValue = assignedTest.hashValue
+          setStorage(experiment.id, 'active_ts', activeTest)
+          setStorage(
+            experiment.id,
+            'active_ts_name',
+            `${activeTestName} (${activeTestHashValue || 'N/A'})`
+          )
+        } catch (error) {
+          console.error('Error assigning user to test:', error)
+          // Fallback to control group
+          activeTest = experiment.controlGroup
+          activeTestName = 'Control'
+          setStorage(experiment.id, 'active_ts', activeTest)
+          setStorage(experiment.id, 'active_ts_name', activeTestName)
+        }
+      }
+
+      // Store active experiment data in local storage for web pixel
+
+      // Store active experiment data in local storage for web pixel
+      if (experiment?.experimentType != 'theme_testing') {
+        console.log(
+          `%cUser assigned to test: ${activeTestName} of ${experiment.name}`,
+          'color: lightgreen; font-weight:bold;'
+        )
+      } else {
+        console.log(
+          `%cTheme Testing running of (${experiment.name})`,
+          'color: lightgreen; font-weight:bold;'
+        )
+      }
+
+      const utmParams = getUTMParams()
+      const newProducts = applyTestPrices(experiment, activeTest)
+      products.push(...newProducts)
+      storeExperimentData(experiments, products, utmParams)
+      updateProductPrices()
+      for (const product of newProducts) {
+        if (product?.imageUrl) {
+          updateProductImages(
+            product?.productId,
+            product?.productHandle,
+            product?.imageUrl,
+            true
+          )
+        }
+      }
+
+      // Schedule reset at experiment end
+      let resetTime = new Date(endDate).getTime() - now
+      if (resetTime > 0) {
+        setTimeout(() => {
+          console.clear()
+          console.log(
+            '%cTest period is over. Resetting everything.',
+            'color: red; font-weight: bold;'
           )
           ignoreTest()
-          continue
-        }
-
-        // Get or assign user to a test
-        let activeTest = getStorage(experiment.id, 'active_ts')
-        let activeTestName = getStorage(experiment.id, 'active_ts_name')
-
-        if (!activeTest) {
-          try {
-            const assignedTest = await distributeUserToTest(experiment)
-
-            activeTest = assignedTest.testId
-            activeTestName = assignedTest.name
-            const activeTestHashValue = assignedTest.hashValue
-            setStorage(experiment.id, 'active_ts', activeTest)
-            setStorage(
-              experiment.id,
-              'active_ts_name',
-              `${activeTestName} (${activeTestHashValue || 'N/A'})`
-            )
-          } catch (error) {
-            console.error('Error assigning user to test:', error)
-            // Fallback to control group
-            activeTest = experiment.controlGroup
-            activeTestName = 'Control'
-            setStorage(experiment.id, 'active_ts', activeTest)
-            setStorage(experiment.id, 'active_ts_name', activeTestName)
-          }
-        }
-
-        // Store active experiment data in local storage for web pixel
-
-        // Store active experiment data in local storage for web pixel
-        if (experiment?.experimentType != 'theme_testing') {
-          console.log(
-            `%cUser assigned to test: ${activeTestName} of ${experiment.name}`,
-            'color: lightgreen; font-weight:bold;'
-          )
-        } else {
-          console.log(
-            `%cTheme Testing running of (${experiment.name})`,
-            'color: lightgreen; font-weight:bold;'
-          )
-        }
-
-        const utmParams = getUTMParams()
-        const newProducts = applyTestPrices(experiment, activeTest)
-        products.push(...newProducts)
-        storeExperimentData(experiments, products, utmParams)
-        updateProductPrices()
-        for (const product of newProducts) {
-          if (product?.imageUrl) {
-            updateProductImages(
-              product?.productId,
-              product?.productHandle,
-              product?.imageUrl,
-              true
-            )
-          }
-        }
-
-        // Schedule reset at experiment end
-        let resetTime = new Date(endDate).getTime() - now
-        if (resetTime > 0) {
-          setTimeout(() => {
-            console.clear()
-            console.log(
-              '%cTest period is over. Resetting everything.',
-              'color: red; font-weight: bold;'
-            )
-            ignoreTest()
-          }, resetTime)
-        }
-      } else {
-        consoleLog('Experiment ended')
-        ignoreTest()
+        }, resetTime)
       }
+    } else {
+      consoleLog('Experiment ended')
+      ignoreTest()
     }
 
     if (!experimentFound) {
@@ -1847,9 +1837,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         setStorage(experiment.id, 'active_ts', currentTest.id)
         setStorage(experiment.id, 'last_ts_switch', now)
         console.log(
-          `%cCurrently Running: ${currentTest?.id || 'No test name'} ${
+          `%cCurrently Running(Timebased): ${
             currentTest?.name ? `(${currentTest?.name})` : ''
-          } of (${experiment.name})`,
+          } of ${experiment.name}`,
           'color: lightgreen; font-weight: bold;'
         )
 
@@ -1876,7 +1866,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const nextTestTime = new Date(nextTest.time).getTime()
 
       console.log(
-        `%cNext Test: ${nextTest?.name} of ${
+        `%cNext Test(Timebased): ${nextTest?.name} of ${
           experiment?.name
         } (scheduled for ${new Date(nextTestTime).toLocaleString()})`,
         'color: orange; font-weight: bold;'
@@ -1943,77 +1933,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function switchTest() {
+  function switchTest(experiment, experiments) {
     const now = Date.now()
-    let experiments = JSON.parse(signal_rules)
     let experimentFound = false
 
-    experiments.forEach((experiment) => {
-      if (experiment.status != 'active') return
+    const startDate = new Date(experiment?.startDate).getTime()
+    const endDate = new Date(experiment?.endDate).getTime()
+    const ignoreTest = () => {
+      localStorage.removeItem('signal_active_experiments')
+      removeStorage(experiment.id, 'active_ts')
+      removeStorage(experiment.id, 'last_ts_switch')
+      removeStorage(experiment.id, 'next_ts_time')
 
-      const startDate = new Date(experiment?.startDate).getTime()
-      const endDate = new Date(experiment?.endDate).getTime()
-      const ignoreTest = () => {
-        localStorage.removeItem('signal_active_experiments')
-        removeStorage(experiment.id, 'active_ts')
-        removeStorage(experiment.id, 'last_ts_switch')
-        removeStorage(experiment.id, 'next_ts_time')
-
-        const newProducts = applyTestPrices(
-          experiment,
-          experiment?.controlGroup
+      const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
+      products.push(...newProducts)
+      updateProductPrices()
+    }
+    if (now >= startDate && now <= endDate) {
+      experimentFound = true
+      if (!isUTMAllowed(experiment)) {
+        console.log(
+          '%cUTM rule disabled this test. Skipping...',
+          'color: gray;'
         )
-        products.push(...newProducts)
-        updateProductPrices()
-      }
-      if (now >= startDate && now <= endDate) {
-        experimentFound = true
-        if (!isUTMAllowed(experiment)) {
-          console.log(
-            '%cUTM rule disabled this test. Skipping...',
-            'color: gray;'
-          )
-          ignoreTest()
-          return
-        }
-
-        if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
-          // Store active experiment data in local storage for web pixel
-          const activeTest = getStorage(experiment.id, 'active_ts')
-
-          if (activeTest) {
-            const activeProducts = experiment.testingProducts?.filter(
-              (p) => p.testId === activeTest
-            )
-            const utmParams = getUTMParams()
-            storeExperimentData(experiments, products, utmParams)
-          }
-
-          const duration = (endDate - startDate) / (1000 * 60)
-          const testIntervals = []
-          let cumulativeTime = startDate
-
-          experiment?.tests.forEach((test) => {
-            let allocation =
-              (parseFloat(test.allocation) / 100) * duration * 60 * 1000
-            testIntervals.push({
-              id: test?.testId,
-              time: cumulativeTime,
-              name: test?.name
-            })
-            cumulativeTime += allocation
-          })
-          console.log(
-            `%cFound active experiment: ${experiment.name}`,
-            'color: yellow; font-weight:bold;'
-          )
-          scheduleNextTest(testIntervals, experiment, endDate)
-        }
-      } else {
-        // Clear active experiment data when experiment ends
         ignoreTest()
+        return
       }
-    })
+
+      if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
+        // Store active experiment data in local storage for web pixel
+        const activeTest = getStorage(experiment.id, 'active_ts')
+
+        const utmParams = getUTMParams()
+        storeExperimentData(experiments, products, utmParams)
+
+        const duration = (endDate - startDate) / (1000 * 60)
+        const testIntervals = []
+        let cumulativeTime = startDate
+
+        experiment?.tests.forEach((test) => {
+          let allocation =
+            (parseFloat(test.allocation) / 100) * duration * 60 * 1000
+          testIntervals.push({
+            id: test?.testId,
+            time: cumulativeTime,
+            name: test?.name
+          })
+          cumulativeTime += allocation
+        })
+        // console.log(
+        //   `%cFound active experiment: ${experiment.name}`,
+        //   'color: yellow; font-weight:bold;'
+        // )
+        scheduleNextTest(testIntervals, experiment, endDate)
+      }
+    } else {
+      // Clear active experiment data when experiment ends
+      ignoreTest()
+    }
 
     if (!experimentFound) {
       // Clear active experiment data when no experiments are running
@@ -2881,8 +2858,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   waitForUserSession(async () => {
     try {
-      await switchTestByUser()
-      // switchTest()
+      const experiments = JSON.parse(signal_rules)
+      experiments.forEach(async (experiment) => {
+        if (experiment.schedule.method == 'time-based') {
+          switchTest(experiment, experiments)
+        } else {
+          await switchTestByUser(experiment, experiments)
+        }
+      })
     } catch (e) {
       console.error(e)
     }

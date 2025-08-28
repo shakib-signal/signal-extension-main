@@ -180,6 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showModalIfAllowed()
     getThemeInfo()
     await fetchSelector()
+    // preview_setupSearchAndModalListeners()
   } catch (error) {
     console.error('❌ Error in classDetectionModal.js:', error)
   }
@@ -3440,18 +3441,30 @@ function getProductInfoFromElement(el, inputId) {
   const productId =
     container.getAttribute('data-product-id') ||
     container.getAttribute('data-pid')
-  const productHandle =
+  let productHandle =
     container.getAttribute('data-product-handle') ||
     container.getAttribute('data-handle')
+
+  // 🔽 Fallback: look for anchor href containing /products/
+  if (!productHandle) {
+    const anchor = container.querySelector('a[href*="/products/"]')
+    if (anchor) {
+      const href = anchor.getAttribute('href') || ''
+      const match = href.match(/\/products\/([^/?#]+)/) // capture handle
+      if (match) {
+        productHandle = match[1]
+      }
+    }
+  }
   // Get variantId from URL if on a product page
   let variantId = null
   const pathname = window.location.pathname
   const urlParams = new URLSearchParams(window.location.search)
   if (pathname.includes('/products/')) {
-    variantId = urlParams.get('variant')
     if (!variantId) {
+      variantId = urlParams.get('variant')
       variantId = firstVariant_product?.toString()
-      console.log('productVariant', variantId)
+      // console.log('productVariant', variantId)
     }
   }
 
@@ -3498,6 +3511,8 @@ function updatePricesForPage(selector, isRegular, isbadge) {
   const selectedTestGroupId = selectEl.value
   if (!selectedTestGroupId) return
 
+  console.log('selectedTestGroupId', selectedTestGroupId)
+
   const testingProducts = parsedPayload?.productInfo?.testingProducts || []
 
   // Normalize selector to an array of elements
@@ -3515,6 +3530,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
   if (!elements.length) return
 
   elements.forEach((el) => {
+    // console.log('el', el)
     let inputId
     if (!isbadge) {
       inputId = isRegular
@@ -3525,7 +3541,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
     }
     const productInfo = getProductInfoFromElement(el, inputId)
 
-    // console.log('productInfo', productInfo)
+    console.log('productInfo', productInfo)
     // console.log('testingproducts', testingProducts)
     if (!productInfo) return
 
@@ -3536,11 +3552,14 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
       if (window.location.pathname.includes('/products/')) {
         // If variantId exists, only match by variant
-        if (selected_variant_name) {
-          return p.variantName === selected_variant_name
-        } else if (productInfo.variantId) {
-          // console.log('productVariant', productInfo.variantId)
-          return p.variantId === productInfo.variantId
+        if (p.productId === productInfo.productId) {
+          if (selected_variant_name) {
+            const productVarinat = `${p.productHandle} + "_" + ${p.variantName}`
+            return productVarinat === selected_variant_name
+          } else if (productInfo.variantId) {
+            console.log('productVariant', productInfo.variantId)
+            return p.variantId === productInfo.variantId
+          }
         }
       }
 
@@ -3647,6 +3666,7 @@ function safelyUpdatePrice(el, formattedPrice, isbadge, attempt = 0) {
 
   // If element is still in DOM, try setting price
   if (document.body.contains(el)) {
+    // console.log('el', el)
     updatedDom.push(el)
     el.innerText = formattedPrice
     if (!isbadge) {
@@ -3687,13 +3707,20 @@ function highlightChange(element) {
 
 document
   .querySelectorAll(
-    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"],.js-product-option'
+    'input[name="id"], input[type="radio"], input[type="radio"][data-variant-id], select[name="id"],.js-product-option'
   )
   .forEach((select) => {
     select.addEventListener('change', () => {
       // console.log('variant change');
       if (parsedPayload?.appName === 'Signal') {
-        selected_variant_name = select.value
+        const selectedHandle = select.getAttribute('data-handle')
+        // console.log('selectedHandle', selectedHandle)
+        selected_variant_name = selectedHandle
+          ? `${selectedHandle} + "_" + ${select.value}`
+          : null
+
+        // console.log('reqularEl', regularEl)
+        // console.log('compareEl', compareEl)
 
         // Wait for theme DOM update to complete before updating price
         setTimeout(() => {
@@ -3703,3 +3730,178 @@ document
       }
     })
   })
+
+// function preview_setupSearchAndModalListeners() {
+//   consoleLog('Setting up search and modal listeners')
+
+//   // Listen for search input changes
+//   document.addEventListener('input', (event) => {
+//     try {
+//       const searchInput = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId.join(',')},`
+//             : ''
+//         } input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+//       )
+//       if (!searchInput) return
+//       // Update prices after a short delay to allow search results to load
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search input handler:', error)
+//     }
+//   })
+
+//   // Listen for search form submissions
+//   document.addEventListener('submit', (event) => {
+//     try {
+//       const searchForm = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId.join(',')},`
+//             : ''
+//         } form[action*="query"]`
+//       )
+//       if (!searchForm) return
+
+//       // Update prices after form submission
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search form handler:', error)
+//     }
+//   })
+
+//   // Listen for clicks on search results
+//   document.addEventListener('click', (event) => {
+//     try {
+//       const searchResult = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId?.join(',')},`
+//             : ''
+//         } .slider--search-presets, input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+//       )
+//       if (!searchResult) return
+
+//       // Update prices when a search result is clicked
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search result click handler:', error)
+//     }
+//   })
+
+//   // Listen for modal open events
+//   document.addEventListener('click', (event) => {
+//     try {
+//       const modalTrigger = event.target.closest(
+//         `${
+//           modalClassOrId?.length > 0
+//             ? `${modalClassOrId.join(',')},`
+//             : ''
+//         } [data-modal-trigger],.predictive-search, [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
+//       )
+//       if (!modalTrigger) return
+
+//       // Get the specific modal ID from the trigger
+//       let modalId = null
+//       if (modalTrigger.hasAttribute('data-modal')) {
+//         modalId = modalTrigger.getAttribute('data-modal')
+//       } else if (modalTrigger.closest('modal-opener')) {
+//         modalId = modalTrigger
+//           .closest('modal-opener')
+//           .getAttribute('data-modal')
+//       } else if (modalTrigger.hasAttribute('aria-controls')) {
+//         modalId = modalTrigger.getAttribute('aria-controls')
+//       }
+
+//       // Update prices when a modal is opened
+//       setTimeout(() => {
+//         try {
+//           // Find the open modal
+//           const openModal = document.querySelector('quick-add-modal[open]')
+//           if (openModal) {
+//             consoleLog('Found Open Modal:', openModal)
+
+//             // Get the product info from the open modal
+//             const productInfo = openModal.querySelector('product-info')
+//             if (productInfo) {
+//               const productId = productInfo.getAttribute('data-product-id')
+
+//               // Get the variant ID from the form
+//               const form = openModal.querySelector(
+//                 'form[action*="/cart/add"]'
+//               )
+//               if (form) {
+//                 const variantInput = form.querySelector('input[name="id"]')
+//                 if (variantInput) {
+//                   const variantId = variantInput.value
+
+//                   // Update prices for this specific product/variant
+//                   if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 									if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//                 }
+//               }
+//             }
+//           }
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in modal trigger handler:', error)
+//     }
+//   })
+
+//   // Listen for Shopify's predictive search results
+//   document.addEventListener('predictive-search:render', () => {
+//     try {
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in predictive search handler:', error)
+//     }
+//   })
+
+//   // Listen for custom search events that might be added by themes
+//   document.addEventListener('search:results', () => {
+//     try {
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search results handler:', error)
+//     }
+//   })
+// }

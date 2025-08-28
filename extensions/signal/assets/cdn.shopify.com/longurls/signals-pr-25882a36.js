@@ -882,6 +882,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     return sellingObj
   }
 
+  const hideIndividualPriceElements = (productContainer) => {
+    const priceElements = findPriceElements(productContainer)
+    hidePriceElements(priceElements)
+  }
+
   const updateVariantPriceOnCard = (productContainer, variantInput) => {
     // const productContainer = variantInput.closest(
     //   possibleSelectors.productCardContainer.join(',')
@@ -895,9 +900,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
     })
     if (!matchingVariant) {
-      consoleLog(
-        `No matching variant found for ${productHandle} - ${variantValue}`
-      )
+      consoleLog(`No matching variant found for ${variantValue}`)
       return
     }
     const {
@@ -917,25 +920,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   // change handler
   const variantHandler = (event) => {
+    // const productContainer = document.querySelectorAll(
+    //   [
+    //     ...possibleSelectors.singleProductContainer,
+    //     ...possibleSelectors.productCardContainer
+    //   ].join(',')
+    // )
+    // if (productContainer) {
+    //   for (const container of productContainer) {
+    //     const priceElements = findPriceElements(container)
+    //     hidePriceElements(priceElements)
+    //   }
+    // }
+
     try {
       // sellingPlanHandler(event)
-      const variantInput = event.target.closest(
-        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
-      )
       const productContainer = event.target.closest(
         [
           ...possibleSelectors.singleProductContainer,
           ...possibleSelectors.productCardContainer
         ].join(',')
       )
-
-      // if (productContainer) {
-      //   for (const container of productContainer) {
-      //   }
-      // }
-      const priceElements = findPriceElements(productContainer)
-      hidePriceElements(priceElements)
-
+      hideIndividualPriceElements(productContainer)
+      const variantInput = event.target.closest(
+        'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
+      )
       // Update prices after a short delay to allow variant changes to complete
       setTimeout(() => {
         try {
@@ -1158,8 +1167,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       return
     }
 
-    const { price, compareAtPrice, discountAmount, discountPercentage } =
-      matchedProduct
+    const {
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage,
+      productHandle
+    } = matchedProduct
 
     const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
@@ -1169,20 +1183,92 @@ document.addEventListener('DOMContentLoaded', async () => {
     // if (sellingObj?.isToggleOn) {
     //   price = subscribeSellingPlane(matchedProduct, price, products, variantId)
     // }
-
     // Find and update price elements
+
     for (const container of productContainer) {
-      const priceElements = findPriceElements(container)
-      hidePriceElements(priceElements)
-      updatePriceElements(
-        priceElements,
-        price,
-        compareAtPrice,
-        discountAmount,
-        discountPercentage
+      const productCardContainer = container.closest(
+        possibleSelectors.productCardContainer.join(',')
       )
+      if (!productCardContainer) {
+        consoleLog(`Updating regular product container`)
+        const priceElements = findPriceElements(container)
+        hidePriceElements(priceElements)
+        updatePriceElements(
+          priceElements,
+          price,
+          compareAtPrice,
+          discountAmount,
+          discountPercentage
+        )
+      } else {
+        // This is a regular product container (not a product card) - update it
+        // Check if this product card matches the current product
+        const anchor = productCardContainer.querySelector(
+          `a[href*="/products/${productHandle}"]`
+        )
+        if (anchor) {
+          // This product card matches the current product - update it
+          consoleLog(`Found matching product card for ${productHandle}`)
+          updateSingleProductCard(productCardContainer, matchedProduct)
+        } else {
+          // This product card is for a different product - skip it
+          consoleLog(`Skipping product card for different product`)
+        }
+      }
     }
   }
+
+  // Function to update a single product card with specific product data
+  function updateSingleProductCard(container, product) {
+    const {
+      productHandle,
+      variantId,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
+    } = product
+
+    consoleLog(
+      `Updating single product card for ${productHandle} with price ${price}`
+    )
+
+    // Find the anchor link for this product
+    const anchor = container.querySelector(
+      `a[href*="/products/${productHandle}"]`
+    )
+    if (!anchor) {
+      consoleLog(`No anchor found for ${productHandle} in container`)
+      return
+    }
+
+    // Update the anchor URL with the variant ID
+    if (anchor.tagName === 'A') {
+      try {
+        const currentHref = new URL(anchor.href, window.location.origin)
+        currentHref.searchParams.set('variant', variantId)
+        anchor.href = currentHref.toString()
+      } catch (error) {
+        consoleLog(`Error updating anchor href for ${productHandle}:`, error)
+      }
+    }
+
+    // Find and update price elements
+    const priceElements = findPriceElements(container)
+
+    // Update main product price
+    updatePriceElements(
+      priceElements,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
+    )
+
+    // Update variant prices if container exists
+    updateVariantPricesOnCard(container, productHandle)
+  }
+
   const sortCatalogProducts = () => {
     const groupedByHandle = {}
     const filteredProducts = products?.filter(
@@ -1253,12 +1339,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     })
   }
-  function updateProductPricesOnCard() {
+  function updateProductPricesOnCardX() {
     if (!products || !products.length) {
       console.warn('No products available.')
       revealAllHiddenClasses()
       return
     }
+    const productContainers = document.querySelectorAll(
+      possibleSelectors.productCardContainer.join(',')
+    )
 
     const sortedProducts = sortCatalogProducts()
     sortedProducts.forEach((product) => {
@@ -1271,13 +1360,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         discountAmount,
         discountPercentage
       } = product
-      document
+      productContainers
         .querySelectorAll(`a[href*='/products/${productHandle}']`)
         .forEach((anchor) => {
           // const productContainer = anchor.closest(
           //   // '.grid__item, .card-wrapper, .product-card-wrapper'
           //   '.card-wrapper'
           // )
+          console.log('updateProductPricesOnCard', productHandle)
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
             if (
@@ -1319,6 +1409,59 @@ document.addEventListener('DOMContentLoaded', async () => {
           )
           updateVariantPricesOnCard(productContainer, productHandle)
         })
+    })
+  }
+  function updateProductPricesOnCard() {
+    if (!products || !products.length) {
+      console.warn('No products available.')
+      revealAllHiddenClasses()
+      return
+    }
+
+    // All product containers on page
+    const productContainers = document.querySelectorAll(
+      possibleSelectors.productCardContainer.join(',')
+    )
+
+    const sortedProducts = sortCatalogProducts()
+
+    sortedProducts.forEach((product) => {
+      const {
+        productHandle,
+        variantId,
+        price,
+        compareAtPrice,
+        discountAmount,
+        discountPercentage
+      } = product
+
+      // Find matching containers for this product by anchor href
+      productContainers.forEach((container) => {
+        const anchor = container.querySelector(
+          `a[href*="/products/${productHandle}"]`
+        )
+        if (!anchor) return
+
+        // Ensure anchor URL includes variant
+        if (anchor.tagName === 'A') {
+          const currentHref = new URL(anchor.href, window.location.origin)
+          currentHref.searchParams.set('variant', variantId)
+          anchor.href = currentHref.toString()
+        }
+
+        // Update main product price
+        const priceElements = findPriceElements(container)
+        updatePriceElements(
+          priceElements,
+          price,
+          compareAtPrice,
+          discountAmount,
+          discountPercentage
+        )
+
+        // Update variant option prices (radio buttons inside the card)
+        updateVariantPricesOnCard(container, productHandle)
+      })
     })
   }
 
@@ -1680,10 +1823,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { testId: experiment.controlGroup, name: 'Control' }
   }
 
-  async function switchTestByUser() {
+  async function switchTestByUser(experiment, experiments) {
     const now = Date.now()
-    let experiments = JSON.parse(signal_rules) || []
-    consoleLog('experiments', experiments)
 
     let experimentFound = false
     if (experiments?.length == 0) {
@@ -1694,114 +1835,106 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
       return
     }
-    for (const experiment of experiments) {
-      if (experiment.status !== 'active') continue
+    // if (experiment.status !== 'active') return
 
-      const startDate = new Date(experiment?.startDate).getTime()
-      const endDate = new Date(experiment?.endDate).getTime()
+    const startDate = new Date(experiment?.startDate).getTime()
+    const endDate = new Date(experiment?.endDate).getTime()
 
-      const ignoreTest = () => {
-        localStorage.removeItem('signal_active_experiments')
-        removeStorage(experiment.id, 'active_ts')
-        removeStorage(experiment.id, 'last_ts_switch')
-        removeStorage(experiment.id, 'next_ts_time')
+    const ignoreTest = () => {
+      localStorage.removeItem('signal_active_experiments')
+      removeStorage(experiment.id, 'active_ts')
+      removeStorage(experiment.id, 'last_ts_switch')
+      removeStorage(experiment.id, 'next_ts_time')
 
-        const newProducts = applyTestPrices(
-          experiment,
-          experiment?.controlGroup
-        )
-        products.push(...newProducts)
-        updateProductPrices()
+      const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
+      products.push(...newProducts)
+      updateProductPrices()
+    }
+    const trouthy = endDate
+      ? now >= startDate && now <= endDate
+      : now >= startDate
+
+    if (trouthy) {
+      experimentFound = true
+      if (!isUTMAllowed(experiment)) {
+        consoleLog('%cUTM rule disabled this test. Skipping...', 'color: gray;')
+        ignoreTest()
+        return
       }
-      const trouthy = endDate
-        ? now >= startDate && now <= endDate
-        : now >= startDate
 
-      if (trouthy) {
-        experimentFound = true
-        if (!isUTMAllowed(experiment)) {
-          consoleLog(
-            '%cUTM rule disabled this test. Skipping...',
-            'color: gray;'
+      // Get or assign user to a test
+      let activeTest = getStorage(experiment.id, 'active_ts')
+      let activeTestName = getStorage(experiment.id, 'active_ts_name')
+
+      if (!activeTest) {
+        try {
+          const assignedTest = await distributeUserToTest(experiment)
+
+          activeTest = assignedTest.testId
+          activeTestName = assignedTest.name
+          const activeTestHashValue = assignedTest.hashValue
+          setStorage(experiment.id, 'active_ts', activeTest)
+          setStorage(
+            experiment.id,
+            'active_ts_name',
+            `${activeTestName} (${activeTestHashValue || 'N/A'})`
+          )
+        } catch (error) {
+          console.error('Error assigning user to test:', error)
+          // Fallback to control group
+          activeTest = experiment.controlGroup
+          activeTestName = 'Control'
+          setStorage(experiment.id, 'active_ts', activeTest)
+          setStorage(experiment.id, 'active_ts_name', activeTestName)
+        }
+      }
+
+      // Store active experiment data in local storage for web pixel
+
+      // Store active experiment data in local storage for web pixel
+      if (experiment?.experimentType != 'theme_testing') {
+        console.log(
+          `%cUser assigned to test: ${activeTestName} of ${experiment.name}`,
+          'color: lightgreen; font-weight:bold;'
+        )
+      } else {
+        console.log(
+          `%cTheme Testing running of (${experiment.name})`,
+          'color: lightgreen; font-weight:bold;'
+        )
+      }
+
+      const utmParams = getUTMParams()
+      const newProducts = applyTestPrices(experiment, activeTest)
+      products.push(...newProducts)
+      storeExperimentData(experiments, products, utmParams)
+      updateProductPrices()
+      for (const product of newProducts) {
+        if (product?.imageUrl) {
+          updateProductImages(
+            product?.productId,
+            product?.productHandle,
+            product?.imageUrl,
+            true
+          )
+        }
+      }
+
+      // Schedule reset at experiment end
+      let resetTime = new Date(endDate).getTime() - now
+      if (resetTime > 0) {
+        setTimeout(() => {
+          console.clear()
+          console.log(
+            '%cTest period is over. Resetting everything.',
+            'color: red; font-weight: bold;'
           )
           ignoreTest()
-          continue
-        }
-
-        // Get or assign user to a test
-        let activeTest = getStorage(experiment.id, 'active_ts')
-        let activeTestName = getStorage(experiment.id, 'active_ts_name')
-
-        if (!activeTest) {
-          try {
-            const assignedTest = await distributeUserToTest(experiment)
-
-            activeTest = assignedTest.testId
-            activeTestName = assignedTest.name
-            const activeTestHashValue = assignedTest.hashValue
-            setStorage(experiment.id, 'active_ts', activeTest)
-            setStorage(
-              experiment.id,
-              'active_ts_name',
-              `${activeTestName} (${activeTestHashValue || 'N/A'})`
-            )
-          } catch (error) {
-            console.error('Error assigning user to test:', error)
-            // Fallback to control group
-            activeTest = experiment.controlGroup
-            activeTestName = 'Control'
-            setStorage(experiment.id, 'active_ts', activeTest)
-            setStorage(experiment.id, 'active_ts_name', activeTestName)
-          }
-        }
-
-        // Store active experiment data in local storage for web pixel
-
-        // Store active experiment data in local storage for web pixel
-        if (experiment?.experimentType != 'theme_testing') {
-          console.log(
-            `%cUser assigned to test: ${activeTestName} of ${experiment.name}`,
-            'color: lightgreen; font-weight:bold;'
-          )
-        } else {
-          console.log(
-            `%cTheme Testing running of (${experiment.name})`,
-            'color: lightgreen; font-weight:bold;'
-          )
-        }
-
-        const utmParams = getUTMParams()
-        const newProducts = applyTestPrices(experiment, activeTest)
-        products.push(...newProducts)
-        storeExperimentData(experiments, products, utmParams)
-        updateProductPrices()
-        for (const product of newProducts) {
-          if (product?.imageUrl) {
-            updateProductImages(
-              product?.productId,
-              product?.productHandle,
-              product?.imageUrl,
-              true
-            )
-          }
-        }
-
-        // Schedule reset at experiment end
-        let resetTime = new Date(endDate).getTime() - now
-        if (resetTime > 0) {
-          setTimeout(() => {
-            console.clear()
-            console.log(
-              '%cTest period is over. Resetting everything.',
-              'color: red; font-weight: bold;'
-            )
-            ignoreTest()
-          }, resetTime)
-        }
-      } else {
-        consoleLog('Experiment ended')
-        ignoreTest()
+        }, resetTime)
       }
+    } else {
+      consoleLog('Experiment ended')
+      ignoreTest()
     }
 
     if (!experimentFound) {
@@ -1838,9 +1971,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         setStorage(experiment.id, 'active_ts', currentTest.id)
         setStorage(experiment.id, 'last_ts_switch', now)
         console.log(
-          `%cCurrently Running: ${currentTest?.id || 'No test name'} ${
+          `%cCurrently Running(Timebased): ${
             currentTest?.name ? `(${currentTest?.name})` : ''
-          } of (${experiment.name})`,
+          } of ${experiment.name}`,
           'color: lightgreen; font-weight: bold;'
         )
 
@@ -1867,7 +2000,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const nextTestTime = new Date(nextTest.time).getTime()
 
       console.log(
-        `%cNext Test: ${nextTest?.name} of ${
+        `%cNext Test(Timebased): ${nextTest?.name} of ${
           experiment?.name
         } (scheduled for ${new Date(nextTestTime).toLocaleString()})`,
         'color: orange; font-weight: bold;'
@@ -1934,77 +2067,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function switchTest() {
+  function switchTest(experiment, experiments) {
     const now = Date.now()
-    let experiments = JSON.parse(signal_rules)
     let experimentFound = false
 
-    experiments.forEach((experiment) => {
-      if (experiment.status != 'active') return
+    const startDate = new Date(experiment?.startDate).getTime()
+    const endDate = new Date(experiment?.endDate).getTime()
+    const ignoreTest = () => {
+      localStorage.removeItem('signal_active_experiments')
+      removeStorage(experiment.id, 'active_ts')
+      removeStorage(experiment.id, 'last_ts_switch')
+      removeStorage(experiment.id, 'next_ts_time')
 
-      const startDate = new Date(experiment?.startDate).getTime()
-      const endDate = new Date(experiment?.endDate).getTime()
-      const ignoreTest = () => {
-        localStorage.removeItem('signal_active_experiments')
-        removeStorage(experiment.id, 'active_ts')
-        removeStorage(experiment.id, 'last_ts_switch')
-        removeStorage(experiment.id, 'next_ts_time')
-
-        const newProducts = applyTestPrices(
-          experiment,
-          experiment?.controlGroup
+      const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
+      products.push(...newProducts)
+      updateProductPrices()
+    }
+    if (now >= startDate && now <= endDate) {
+      experimentFound = true
+      if (!isUTMAllowed(experiment)) {
+        console.log(
+          '%cUTM rule disabled this test. Skipping...',
+          'color: gray;'
         )
-        products.push(...newProducts)
-        updateProductPrices()
-      }
-      if (now >= startDate && now <= endDate) {
-        experimentFound = true
-        if (!isUTMAllowed(experiment)) {
-          console.log(
-            '%cUTM rule disabled this test. Skipping...',
-            'color: gray;'
-          )
-          ignoreTest()
-          return
-        }
-
-        if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
-          // Store active experiment data in local storage for web pixel
-          const activeTest = getStorage(experiment.id, 'active_ts')
-
-          if (activeTest) {
-            const activeProducts = experiment.testingProducts?.filter(
-              (p) => p.testId === activeTest
-            )
-            const utmParams = getUTMParams()
-            storeExperimentData(experiments, products, utmParams)
-          }
-
-          const duration = (endDate - startDate) / (1000 * 60)
-          const testIntervals = []
-          let cumulativeTime = startDate
-
-          experiment?.tests.forEach((test) => {
-            let allocation =
-              (parseFloat(test.allocation) / 100) * duration * 60 * 1000
-            testIntervals.push({
-              id: test?.testId,
-              time: cumulativeTime,
-              name: test?.name
-            })
-            cumulativeTime += allocation
-          })
-          console.log(
-            `%cFound active experiment: ${experiment.name}`,
-            'color: yellow; font-weight:bold;'
-          )
-          scheduleNextTest(testIntervals, experiment, endDate)
-        }
-      } else {
-        // Clear active experiment data when experiment ends
         ignoreTest()
+        return
       }
-    })
+
+      if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
+        // Store active experiment data in local storage for web pixel
+        const activeTest = getStorage(experiment.id, 'active_ts')
+
+        const utmParams = getUTMParams()
+        storeExperimentData(experiments, products, utmParams)
+
+        const duration = (endDate - startDate) / (1000 * 60)
+        const testIntervals = []
+        let cumulativeTime = startDate
+
+        experiment?.tests.forEach((test) => {
+          let allocation =
+            (parseFloat(test.allocation) / 100) * duration * 60 * 1000
+          testIntervals.push({
+            id: test?.testId,
+            time: cumulativeTime,
+            name: test?.name
+          })
+          cumulativeTime += allocation
+        })
+        // console.log(
+        //   `%cFound active experiment: ${experiment.name}`,
+        //   'color: yellow; font-weight:bold;'
+        // )
+        scheduleNextTest(testIntervals, experiment, endDate)
+      }
+    } else {
+      // Clear active experiment data when experiment ends
+      ignoreTest()
+    }
 
     if (!experimentFound) {
       // Clear active experiment data when no experiments are running
@@ -2872,8 +2992,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   waitForUserSession(async () => {
     try {
-      await switchTestByUser()
-      // switchTest()
+      const experiments = JSON.parse(signal_rules)
+      experiments.forEach(async (experiment) => {
+        if (experiment.schedule.method == 'time-based') {
+          switchTest(experiment, experiments)
+        } else {
+          await switchTestByUser(experiment, experiments)
+        }
+      })
     } catch (e) {
       console.error(e)
     }
@@ -3370,7 +3496,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           // ✅ only run if it's a whole product card (adjust selector)
           if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-            console.log('📦 New product card added', node)
+            // console.log('📦 New product card added', node)
 
             updateProductPricesOnCard(node) // pass the card
 
