@@ -1197,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         discountAmount,
         discountPercentage
       )
-      updateProductPricesOnCard()
+      // updateProductPricesOnCard()
       // if (productCardContainer) {
       //   const anchor = productCardContainer.querySelector(
       //     `a[href*="/products/${productHandle}"]`
