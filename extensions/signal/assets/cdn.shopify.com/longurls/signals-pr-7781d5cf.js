@@ -408,6 +408,7 @@ function splitSelectors(selectorArray) {
 }
 
 function hidePriceElements(priceElements) {
+  console.log(priceElements)
   if (!priceElements) return
   ;['compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -773,23 +774,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Find all compare prices
     for (const selector of possibleSelectors.compare) {
-      const elements = foundElements.container.querySelectorAll(selector)
+      const element = foundElements.container.querySelector(selector)
 
-      elements.forEach((element) => {
-        if (element) {
-          foundElements.compare.push(element)
-        }
-      })
+      if (element) {
+        foundElements.compare.push(element)
+      }
+      // elements.forEach((element) => {
+      // })
     }
 
     // Find all sale prices
     for (const selector of possibleSelectors.sale) {
-      const elements = foundElements.container.querySelectorAll(selector)
-      elements.forEach((element) => {
-        if (element) {
-          foundElements.sale.push(element)
-        }
-      })
+      const element = foundElements.container.querySelector(selector)
+      if (element) {
+        foundElements.sale.push(element)
+      }
+      // elements.forEach((element) => {
+      // })
     }
     // Find all badges
     // for (const selector of possibleSelectors.badges) {
@@ -801,14 +802,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     //   })
     // }
     for (const selector of possibleSelectors.badges) {
-      const elements = container.querySelectorAll(selector)
-
-      for (const element of elements) {
-        if (element) {
-          foundElements.badges.push(element)
-          break // stop after first found element
-        }
+      const element = container.querySelector(selector)
+      if (element) {
+        foundElements.badges.push(element)
       }
+      // elements.forEach((element) => {
+      // })
 
       if (foundElements.badges.length > 0) {
         break // stop checking other selectors
@@ -1074,13 +1073,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (compareAtPrice > 0) {
         // If there's a valid compare-at price, update it
-        if (comparePriceEls && comparePriceEls.length > 0) {
-          comparePriceEls.forEach((el) => {
-            updateDom(el, compareAtPrice)
-          })
-        } else {
-          updateDom(priceEl, price) // fallback
-        }
+        priceElements.compare.forEach((el) => {
+          updateDom(el, compareAtPrice)
+        })
+        // if (comparePriceEls && comparePriceEls.length > 0) {
+        // }
+      } else {
+        updateDom(priceEl, price) // fallback
       }
     })
 
@@ -1158,7 +1157,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       .find((product) => {
         return product.variantId == variantId
           ? true
-          : product.variantName == variantId
+          : product.productHandle == productHandle &&
+              product.variantName == variantId
       })
 
     if (!matchedProduct) {
@@ -1175,6 +1175,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       productHandle
     } = matchedProduct
 
+    // const productContainer = document.querySelectorAll(
+    //   possibleSelectors.singleProductContainer.join(',')
+    // )
     const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
@@ -1186,35 +1189,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Find and update price elements
 
     for (const container of productContainer) {
-      const productCardContainer = container.closest(
-        possibleSelectors.productCardContainer.join(',')
+      const priceElements = findPriceElements(container)
+      hidePriceElements(priceElements)
+      updatePriceElements(
+        priceElements,
+        price,
+        compareAtPrice,
+        discountAmount,
+        discountPercentage
       )
-      if (!productCardContainer) {
-        consoleLog(`Updating regular product container`)
-        const priceElements = findPriceElements(container)
-        hidePriceElements(priceElements)
-        updatePriceElements(
-          priceElements,
-          price,
-          compareAtPrice,
-          discountAmount,
-          discountPercentage
-        )
-      } else {
-        // This is a regular product container (not a product card) - update it
-        // Check if this product card matches the current product
-        const anchor = productCardContainer.querySelector(
-          `a[href*="/products/${productHandle}"]`
-        )
-        if (anchor) {
-          // This product card matches the current product - update it
-          consoleLog(`Found matching product card for ${productHandle}`)
-          updateSingleProductCard(productCardContainer, matchedProduct)
-        } else {
-          // This product card is for a different product - skip it
-          consoleLog(`Skipping product card for different product`)
-        }
-      }
+      updateProductPricesOnCard()
+      // if (productCardContainer) {
+      //   const anchor = productCardContainer.querySelector(
+      //     `a[href*="/products/${productHandle}"]`
+      //   )
+      //   if (anchor) {
+      //     const priceElements = findPriceElements(container)
+      //     hidePriceElements(priceElements)
+      //     updatePriceElements(
+      //       priceElements,
+      //       price,
+      //       compareAtPrice,
+      //       discountAmount,
+      //       discountPercentage
+      //     )
+      //   }
+      // }
+      // else {
+      //   const priceElements = findPriceElements(container)
+      //   hidePriceElements(priceElements)
+      //   updatePriceElements(
+      //     priceElements,
+      //     price,
+      //     compareAtPrice,
+      //     discountAmount,
+      //     discountPercentage
+      //   )
+      // }
     }
   }
 

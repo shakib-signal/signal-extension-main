@@ -408,6 +408,7 @@ function splitSelectors(selectorArray) {
 }
 
 function hidePriceElements(priceElements) {
+  console.log(priceElements)
   if (!priceElements) return
   ;['compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -773,23 +774,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Find all compare prices
     for (const selector of possibleSelectors.compare) {
-      const elements = foundElements.container.querySelectorAll(selector)
+      const element = foundElements.container.querySelector(selector)
 
-      elements.forEach((element) => {
-        if (element) {
-          foundElements.compare.push(element)
-        }
-      })
+      if (element) {
+        foundElements.compare.push(element)
+      }
+      // elements.forEach((element) => {
+      // })
     }
 
     // Find all sale prices
     for (const selector of possibleSelectors.sale) {
-      const elements = foundElements.container.querySelectorAll(selector)
-      elements.forEach((element) => {
-        if (element) {
-          foundElements.sale.push(element)
-        }
-      })
+      const element = foundElements.container.querySelector(selector)
+      if (element) {
+        foundElements.sale.push(element)
+      }
+      // elements.forEach((element) => {
+      // })
     }
     // Find all badges
     // for (const selector of possibleSelectors.badges) {
@@ -801,14 +802,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     //   })
     // }
     for (const selector of possibleSelectors.badges) {
-      const elements = container.querySelectorAll(selector)
-
-      for (const element of elements) {
-        if (element) {
-          foundElements.badges.push(element)
-          break // stop after first found element
-        }
+      const element = container.querySelector(selector)
+      if (element) {
+        foundElements.badges.push(element)
       }
+      // elements.forEach((element) => {
+      // })
 
       if (foundElements.badges.length > 0) {
         break // stop checking other selectors
@@ -1074,13 +1073,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (compareAtPrice > 0) {
         // If there's a valid compare-at price, update it
-        if (comparePriceEls && comparePriceEls.length > 0) {
-          comparePriceEls.forEach((el) => {
-            updateDom(el, compareAtPrice)
-          })
-        } else {
-          updateDom(priceEl, price) // fallback
-        }
+        priceElements.compare.forEach((el) => {
+          updateDom(el, compareAtPrice)
+        })
+        // if (comparePriceEls && comparePriceEls.length > 0) {
+        // }
+      } else {
+        updateDom(priceEl, price) // fallback
       }
     })
 
@@ -1167,9 +1166,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       return
     }
 
-    const { price, compareAtPrice, discountAmount, discountPercentage } =
-      matchedProduct
+    const {
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage,
+      productHandle
+    } = matchedProduct
 
+    // const productContainer = document.querySelectorAll(
+    //   possibleSelectors.singleProductContainer.join(',')
+    // )
     const productContainer = document.querySelectorAll(
       possibleSelectors.singleProductContainer.join(',')
     )
@@ -1178,8 +1185,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // if (sellingObj?.isToggleOn) {
     //   price = subscribeSellingPlane(matchedProduct, price, products, variantId)
     // }
-
     // Find and update price elements
+
     for (const container of productContainer) {
       const priceElements = findPriceElements(container)
       hidePriceElements(priceElements)
@@ -1190,8 +1197,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         discountAmount,
         discountPercentage
       )
+      updateProductPricesOnCard()
+      // if (productCardContainer) {
+      //   const anchor = productCardContainer.querySelector(
+      //     `a[href*="/products/${productHandle}"]`
+      //   )
+      //   if (anchor) {
+      //     const priceElements = findPriceElements(container)
+      //     hidePriceElements(priceElements)
+      //     updatePriceElements(
+      //       priceElements,
+      //       price,
+      //       compareAtPrice,
+      //       discountAmount,
+      //       discountPercentage
+      //     )
+      //   }
+      // }
+      // else {
+      //   const priceElements = findPriceElements(container)
+      //   hidePriceElements(priceElements)
+      //   updatePriceElements(
+      //     priceElements,
+      //     price,
+      //     compareAtPrice,
+      //     discountAmount,
+      //     discountPercentage
+      //   )
+      // }
     }
   }
+
+  // Function to update a single product card with specific product data
+  function updateSingleProductCard(container, product) {
+    const {
+      productHandle,
+      variantId,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
+    } = product
+
+    consoleLog(
+      `Updating single product card for ${productHandle} with price ${price}`
+    )
+
+    // Find the anchor link for this product
+    const anchor = container.querySelector(
+      `a[href*="/products/${productHandle}"]`
+    )
+    if (!anchor) {
+      consoleLog(`No anchor found for ${productHandle} in container`)
+      return
+    }
+
+    // Update the anchor URL with the variant ID
+    if (anchor.tagName === 'A') {
+      try {
+        const currentHref = new URL(anchor.href, window.location.origin)
+        currentHref.searchParams.set('variant', variantId)
+        anchor.href = currentHref.toString()
+      } catch (error) {
+        consoleLog(`Error updating anchor href for ${productHandle}:`, error)
+      }
+    }
+
+    // Find and update price elements
+    const priceElements = findPriceElements(container)
+
+    // Update main product price
+    updatePriceElements(
+      priceElements,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
+    )
+
+    // Update variant prices if container exists
+    updateVariantPricesOnCard(container, productHandle)
+  }
+
   const sortCatalogProducts = () => {
     const groupedByHandle = {}
     const filteredProducts = products?.filter(
@@ -1262,12 +1349,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     })
   }
-  function updateProductPricesOnCard() {
+  function updateProductPricesOnCardX() {
     if (!products || !products.length) {
       console.warn('No products available.')
       revealAllHiddenClasses()
       return
     }
+    const productContainers = document.querySelectorAll(
+      possibleSelectors.productCardContainer.join(',')
+    )
 
     const sortedProducts = sortCatalogProducts()
     sortedProducts.forEach((product) => {
@@ -1280,13 +1370,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         discountAmount,
         discountPercentage
       } = product
-      document
+      productContainers
         .querySelectorAll(`a[href*='/products/${productHandle}']`)
         .forEach((anchor) => {
           // const productContainer = anchor.closest(
           //   // '.grid__item, .card-wrapper, .product-card-wrapper'
           //   '.card-wrapper'
           // )
+          console.log('updateProductPricesOnCard', productHandle)
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
             if (
@@ -1328,6 +1419,59 @@ document.addEventListener('DOMContentLoaded', async () => {
           )
           updateVariantPricesOnCard(productContainer, productHandle)
         })
+    })
+  }
+  function updateProductPricesOnCard() {
+    if (!products || !products.length) {
+      console.warn('No products available.')
+      revealAllHiddenClasses()
+      return
+    }
+
+    // All product containers on page
+    const productContainers = document.querySelectorAll(
+      possibleSelectors.productCardContainer.join(',')
+    )
+
+    const sortedProducts = sortCatalogProducts()
+
+    sortedProducts.forEach((product) => {
+      const {
+        productHandle,
+        variantId,
+        price,
+        compareAtPrice,
+        discountAmount,
+        discountPercentage
+      } = product
+
+      // Find matching containers for this product by anchor href
+      productContainers.forEach((container) => {
+        const anchor = container.querySelector(
+          `a[href*="/products/${productHandle}"]`
+        )
+        if (!anchor) return
+
+        // Ensure anchor URL includes variant
+        if (anchor.tagName === 'A') {
+          const currentHref = new URL(anchor.href, window.location.origin)
+          currentHref.searchParams.set('variant', variantId)
+          anchor.href = currentHref.toString()
+        }
+
+        // Update main product price
+        const priceElements = findPriceElements(container)
+        updatePriceElements(
+          priceElements,
+          price,
+          compareAtPrice,
+          discountAmount,
+          discountPercentage
+        )
+
+        // Update variant option prices (radio buttons inside the card)
+        updateVariantPricesOnCard(container, productHandle)
+      })
     })
   }
 
