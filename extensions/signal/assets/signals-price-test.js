@@ -3005,8 +3005,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const experiments = JSON.parse(signal_rules)
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
+          localStorage.clear()
           switchTest(experiment, experiments)
         } else {
+          localStorage.clear()
           await switchTestByUser(experiment, experiments)
         }
       })
