@@ -3585,7 +3585,10 @@ function updatePricesForPage(selector, isRegular, isbadge) {
         }
       }
       if (productInfo.selectedValue) {
-        return p.variantName === productInfo.selectedValue
+        return (
+          p.productHandle === productInfo.productHandle &&
+          p.variantName === productInfo.selectedValue
+        )
       }
       // Fallback to productId or handle
       return (
