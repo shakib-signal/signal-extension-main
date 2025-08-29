@@ -159,7 +159,7 @@ function showModalIfAllowed() {
     console.log('✅ Showing modal...')
     document.body.appendChild(modal)
     renderModal()
-    redirectUrl()
+    initProductSelect()
     // updatePricesForPage()
   }
 }
@@ -361,11 +361,6 @@ function renderModal() {
     ...new Set(testProducts.map((item) => item.productHandle))
   ]
 
-  // Filter out the session product if it exists
-  const filteredHandles = productFromSession
-    ? uniqueHandles.filter((handle) => handle !== productFromSession)
-    : uniqueHandles
-
   function truncateByPixelWidth(text, maxWidthPx, font) {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -538,20 +533,15 @@ function renderModal() {
 					<label style="display: block; margin-bottom: 6px; font-weight: 600; color: #020617">
 					Quick Look
 					</label>
-					<select id="testProductSelect" style="padding: 8px 16px; font-size: 14px; border-radius: 12px; border: 1px solid #E2E8F0; background-color: #fff; width: 100%; cursor: pointer;">
-						${
-              productFromSession
-                ? `<option value="${productFromSession}" title="${productFromSession}">
-										${truncateByPixelWidth(productFromSession, '200px', '14px Arial')}
-									</option>`
-                : ''
-            }
-						${filteredHandles
+					<select id="testProductSelect" 
+						style="padding: 8px 16px; font-size: 14px; border-radius: 12px; border: 1px solid #E2E8F0; background-color: #fff; width: 100%; cursor: pointer;">
+						<option value="">-- Select Product --</option>
+						${uniqueHandles
               .map(
                 (handle) =>
                   `<option value="${handle}" title="${handle}">
-											${truncateByPixelWidth(handle, 290, '14px Arial')}
-										</option>`
+										${truncateByPixelWidth(handle, 290, '14px Arial')}
+									</option>`
               )
               .join('')}
 					</select>
@@ -1444,74 +1434,61 @@ function renderModal() {
     })
   }
 
-  const productSelect = document.getElementById('testProductSelect')
-  if (productSelect) {
-    productSelect.addEventListener('change', () => {
-      console.log('product select click')
-      updateUrlWithProduct(productSelect.value)
-    })
-  }
+  // const productSelect = document.getElementById('testProductSelect')
+  // if (productSelect) {
+  //   productSelect.addEventListener('change', () => {
+  //     console.log('product select click')
+  //     updateUrlWithProduct(productSelect.value)
+  //   })
+  // }
 }
 
-function updateUrlWithProduct(productHandle) {
-  if (!productHandle) return
-
-  const url = new URL(window.location.href)
-  const testingProducts = parsedPayload?.productInfo?.testingProducts
-
-  if (!Array.isArray(testingProducts)) return
-
-  // Find the first matching product by productHandle
-  const matchingProduct = testingProducts.find(
-    (p) => p.productHandle === productHandle
-  )
-
-  if (!matchingProduct) return
-
-  const variantId = matchingProduct.variantId
-
-  // Avoid unnecessary reloads
-  if (
-    url.pathname === `/products/${productHandle}` &&
-    url.searchParams.get('variant') === variantId
-  ) {
-    return
-  }
-
-  // Save to sessionStorage
-  sessionStorage.setItem(PRODUCT_HANDLE, productHandle)
-
-  // Update the path
-  url.pathname = `/products/${productHandle}`
-
-  // Set or update the variant query parameter
-  url.searchParams.set('variant', variantId)
-
-  // Redirect to new path with updated query
-  window.location.href = url.toString()
-}
-
-function redirectUrl() {
+// Initialize dropdown behavior
+function initProductSelect() {
   const productSelect = document.getElementById('testProductSelect')
   if (!productSelect) return
 
-  const currentProduct = productSelect.value
-  const url = new URL(window.location.href)
+  // Extract handle from path: /products/{handle}
+  const pathMatch = window.location.pathname.match(/^\/products\/([^/]+)/)
+  const currentHandle = pathMatch ? pathMatch[1] : null
 
-  // On load, redirect if needed
-  if (currentProduct && url.pathname !== `/products/${currentProduct}`) {
-    updateUrlWithProduct(currentProduct)
-    return
+  if (
+    currentHandle &&
+    [...productSelect.options].some((opt) => opt.value === currentHandle)
+  ) {
+    // If dropdown contains this handle → select it
+    productSelect.value = currentHandle
+  } else {
+    // Otherwise → default
+    productSelect.value = ''
   }
 
-  // On change
+  // On select → redirect
   productSelect.addEventListener('change', () => {
-    console.log('product select changed')
-    updateUrlWithProduct(productSelect.value)
+    const selectedHandle = productSelect.value
+    if (!selectedHandle) return
+
+    // Preserve existing query params
+    const urlParams = new URLSearchParams(window.location.search)
+    const testingProducts = parsedPayload?.productInfo?.testingProducts
+
+    if (!Array.isArray(testingProducts)) return
+
+    // Find the first matching product by productHandle
+    const matchingProduct = testingProducts.find(
+      (p) => p.productHandle === selectedHandle
+    )
+
+    if (!matchingProduct) return
+
+    const variantId = matchingProduct.variantId
+    urlParams.set('variant', variantId) // value is dynamic
+
+    window.location.href = `/products/${selectedHandle}?${urlParams.toString()}`
   })
 }
 
-redirectUrl()
+initProductSelect()
 
 // update button state
 function updateButtonStates() {
@@ -3371,7 +3348,7 @@ document.body.addEventListener('click', (e) => {
 function getProductInfoFromElement(el, inputId) {
   // console.log('el', el)
   const defaultSelectors =
-    '[data-product-id], [data-product-handle], .product-card-wrapper, .card-wrapper, product-page, product-card, product-price, [data-pid], product-info'
+    '[data-product-id], [data-product-handle], .product-card-wrapper, .card-wrapper, product-page, product-card, product-price, [data-pid], product-info, floating-product'
   const savedSelectors = singleProductContainer // assumed to be an array
   const input = document.getElementById(inputId)
   const userInputSelector = input?.value?.trim()
@@ -3426,6 +3403,19 @@ function getProductInfoFromElement(el, inputId) {
     }
   }
 
+  // 🔹 Ignore nested product-card elements inside a container
+  if (container && container.tagName === 'PRODUCT-PAGE') {
+    const closestCard = el.closest('product-card')
+    if (
+      closestCard &&
+      closestCard !== el &&
+      !container.isSameNode(closestCard)
+    ) {
+      // The element is inside a nested product-card in a main product-page → skip
+      return null
+    }
+  }
+
   // 4. Set input value based on which matched
   if (container && input && matchedSelector && matchedFrom) {
     input.value = `${matchedSelector}`
@@ -3434,6 +3424,11 @@ function getProductInfoFromElement(el, inputId) {
   }
 
   // console.log('container', container)
+  // const targetCard = document.querySelector('product-card'); // find the element
+
+  // if (targetCard && container.contains(targetCard)) {
+  // 		container = null;
+  // }
 
   if (!container) return null
 
@@ -3462,6 +3457,17 @@ function getProductInfoFromElement(el, inputId) {
     const selectEl = container.querySelector('select')
     if (selectEl) {
       selectedValue = selectEl.options[selectEl.selectedIndex].value
+    }
+
+    if (el.classList.contains('js-option-price')) {
+      const parentLabel = el.closest('label') // find the wrapping label
+      if (!parentLabel) return
+
+      const parentInput = parentLabel.querySelector('input.js-product-option') // find input inside label
+      if (!parentInput) return
+
+      const value = parentInput.value
+      selectedValue = value
     }
   }
 
@@ -3534,6 +3540,12 @@ function updatePricesForPage(selector, isRegular, isbadge) {
     elements = Array.from(document.querySelectorAll(selector))
   }
 
+  if (isRegular) {
+    // Add .js-option-price elements individually
+    const hover_btn_price = document.querySelectorAll('.js-option-price')
+    elements.push(...hover_btn_price)
+  }
+
   // console.log('elements', elements)
 
   if (!elements.length) return
@@ -3596,8 +3608,6 @@ function updatePricesForPage(selector, isRegular, isbadge) {
       const formattedPrice = formatedPriceWithCurrency(
         parseFloat(priceValue) * 100
       )
-
-      // console.log('el', el)
 
       safelyUpdatePrice(el, formattedPrice, false)
     } else {
