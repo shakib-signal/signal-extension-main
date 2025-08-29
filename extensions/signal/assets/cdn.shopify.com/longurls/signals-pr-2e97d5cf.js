@@ -408,6 +408,7 @@ function splitSelectors(selectorArray) {
 }
 
 function hidePriceElements(priceElements) {
+  console.log(priceElements)
   if (!priceElements) return
   ;['compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -1151,12 +1152,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Helper function to update sale class
 
   function updateSingleProductPrice(variantId) {
+    const url = window.location.href
+    const handle = url?.split('/')?.pop()?.split('?')[0]
+
     const matchedProduct = products
       .filter((p) => p?.experimentType == 'price_testing')
       .find((product) => {
         return product.variantId == variantId
           ? true
-          : product.variantName == variantId
+          : product.productHandle == handle && product.variantName == variantId
       })
 
     if (!matchedProduct) {
@@ -1197,13 +1201,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         discountPercentage
       )
       // updateProductPricesOnCard()
-      // const productCardContainer = container.closest(
-      //   possibleSelectors.productCardContainer.join(',')
-      // )
-      // console.log({ productCardContainer })
-      // if (productCardContainer) {
-      //   updateSingleProductCard(productCardContainer, matchedProduct)
-      // }
       // if (productCardContainer) {
       //   const anchor = productCardContainer.querySelector(
       //     `a[href*="/products/${productHandle}"]`
@@ -1232,7 +1229,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       //   )
       // }
     }
-    // updateProductPricesOnCard()
   }
 
   // Function to update a single product card with specific product data
@@ -1245,6 +1241,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       discountAmount,
       discountPercentage
     } = product
+
+    consoleLog(
+      `Updating single product card for ${productHandle} with price ${price}`
+    )
 
     // Find the anchor link for this product
     const anchor = container.querySelector(
@@ -1380,6 +1380,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           //   // '.grid__item, .card-wrapper, .product-card-wrapper'
           //   '.card-wrapper'
           // )
+          console.log('updateProductPricesOnCard', productHandle)
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
             if (

@@ -408,7 +408,6 @@ function splitSelectors(selectorArray) {
 }
 
 function hidePriceElements(priceElements) {
-  console.log(priceElements)
   if (!priceElements) return
   ;['compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -1152,12 +1151,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Helper function to update sale class
 
   function updateSingleProductPrice(variantId) {
+    const url = window.location.href
+    const handle = url?.split('/')?.pop()?.split('?')[0]
+
     const matchedProduct = products
       .filter((p) => p?.experimentType == 'price_testing')
       .find((product) => {
         return product.variantId == variantId
           ? true
-          : product.variantName == variantId
+          : product.productHandle == handle && product.variantName == variantId
       })
 
     if (!matchedProduct) {
@@ -1377,7 +1379,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           //   // '.grid__item, .card-wrapper, .product-card-wrapper'
           //   '.card-wrapper'
           // )
-          console.log('updateProductPricesOnCard', productHandle)
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
             if (
@@ -3012,7 +3013,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Remove them
     keysToRemove.forEach((key) => {
       localStorage.removeItem(key)
-      console.log(`🗑️ Removed localStorage key: ${key}`)
+      // console.log(`🗑️ Removed localStorage key: ${key}`)
     })
   }
 
