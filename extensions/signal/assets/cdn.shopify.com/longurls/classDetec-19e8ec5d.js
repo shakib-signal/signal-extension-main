@@ -159,7 +159,7 @@ function showModalIfAllowed() {
     console.log('✅ Showing modal...')
     document.body.appendChild(modal)
     renderModal()
-    redirectUrl()
+    initProductSelect()
     // updatePricesForPage()
   }
 }
@@ -180,6 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showModalIfAllowed()
     getThemeInfo()
     await fetchSelector()
+    // preview_setupSearchAndModalListeners()
   } catch (error) {
     console.error('❌ Error in classDetectionModal.js:', error)
   }
@@ -360,11 +361,6 @@ function renderModal() {
     ...new Set(testProducts.map((item) => item.productHandle))
   ]
 
-  // Filter out the session product if it exists
-  const filteredHandles = productFromSession
-    ? uniqueHandles.filter((handle) => handle !== productFromSession)
-    : uniqueHandles
-
   function truncateByPixelWidth(text, maxWidthPx, font) {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -537,20 +533,15 @@ function renderModal() {
 					<label style="display: block; margin-bottom: 6px; font-weight: 600; color: #020617">
 					Quick Look
 					</label>
-					<select id="testProductSelect" style="padding: 8px 16px; font-size: 14px; border-radius: 12px; border: 1px solid #E2E8F0; background-color: #fff; width: 100%; cursor: pointer;">
-						${
-              productFromSession
-                ? `<option value="${productFromSession}" title="${productFromSession}">
-										${truncateByPixelWidth(productFromSession, '200px', '14px Arial')}
-									</option>`
-                : ''
-            }
-						${filteredHandles
+					<select id="testProductSelect" 
+						style="padding: 8px 16px; font-size: 14px; border-radius: 12px; border: 1px solid #E2E8F0; background-color: #fff; width: 100%; cursor: pointer;">
+						<option value="">-- Select Product --</option>
+						${uniqueHandles
               .map(
                 (handle) =>
                   `<option value="${handle}" title="${handle}">
-											${truncateByPixelWidth(handle, 290, '14px Arial')}
-										</option>`
+										${truncateByPixelWidth(handle, 290, '14px Arial')}
+									</option>`
               )
               .join('')}
 					</select>
@@ -1443,74 +1434,61 @@ function renderModal() {
     })
   }
 
-  const productSelect = document.getElementById('testProductSelect')
-  if (productSelect) {
-    productSelect.addEventListener('change', () => {
-      console.log('product select click')
-      updateUrlWithProduct(productSelect.value)
-    })
-  }
+  // const productSelect = document.getElementById('testProductSelect')
+  // if (productSelect) {
+  //   productSelect.addEventListener('change', () => {
+  //     console.log('product select click')
+  //     updateUrlWithProduct(productSelect.value)
+  //   })
+  // }
 }
 
-function updateUrlWithProduct(productHandle) {
-  if (!productHandle) return
-
-  const url = new URL(window.location.href)
-  const testingProducts = parsedPayload?.productInfo?.testingProducts
-
-  if (!Array.isArray(testingProducts)) return
-
-  // Find the first matching product by productHandle
-  const matchingProduct = testingProducts.find(
-    (p) => p.productHandle === productHandle
-  )
-
-  if (!matchingProduct) return
-
-  const variantId = matchingProduct.variantId
-
-  // Avoid unnecessary reloads
-  if (
-    url.pathname === `/products/${productHandle}` &&
-    url.searchParams.get('variant') === variantId
-  ) {
-    return
-  }
-
-  // Save to sessionStorage
-  sessionStorage.setItem(PRODUCT_HANDLE, productHandle)
-
-  // Update the path
-  url.pathname = `/products/${productHandle}`
-
-  // Set or update the variant query parameter
-  url.searchParams.set('variant', variantId)
-
-  // Redirect to new path with updated query
-  window.location.href = url.toString()
-}
-
-function redirectUrl() {
+// Initialize dropdown behavior
+function initProductSelect() {
   const productSelect = document.getElementById('testProductSelect')
   if (!productSelect) return
 
-  const currentProduct = productSelect.value
-  const url = new URL(window.location.href)
+  // Extract handle from path: /products/{handle}
+  const pathMatch = window.location.pathname.match(/^\/products\/([^/]+)/)
+  const currentHandle = pathMatch ? pathMatch[1] : null
 
-  // On load, redirect if needed
-  if (currentProduct && url.pathname !== `/products/${currentProduct}`) {
-    updateUrlWithProduct(currentProduct)
-    return
+  if (
+    currentHandle &&
+    [...productSelect.options].some((opt) => opt.value === currentHandle)
+  ) {
+    // If dropdown contains this handle → select it
+    productSelect.value = currentHandle
+  } else {
+    // Otherwise → default
+    productSelect.value = ''
   }
 
-  // On change
+  // On select → redirect
   productSelect.addEventListener('change', () => {
-    console.log('product select changed')
-    updateUrlWithProduct(productSelect.value)
+    const selectedHandle = productSelect.value
+    if (!selectedHandle) return
+
+    // Preserve existing query params
+    const urlParams = new URLSearchParams(window.location.search)
+    const testingProducts = parsedPayload?.productInfo?.testingProducts
+
+    if (!Array.isArray(testingProducts)) return
+
+    // Find the first matching product by productHandle
+    const matchingProduct = testingProducts.find(
+      (p) => p.productHandle === selectedHandle
+    )
+
+    if (!matchingProduct) return
+
+    const variantId = matchingProduct.variantId
+    urlParams.set('variant', variantId) // value is dynamic
+
+    window.location.href = `/products/${selectedHandle}?${urlParams.toString()}`
   })
 }
 
-redirectUrl()
+initProductSelect()
 
 // update button state
 function updateButtonStates() {
@@ -3370,7 +3348,7 @@ document.body.addEventListener('click', (e) => {
 function getProductInfoFromElement(el, inputId) {
   // console.log('el', el)
   const defaultSelectors =
-    '[data-product-id], [data-product-handle], .product-card-wrapper, .card-wrapper, product-page, product-card, product-price, [data-pid], product-info'
+    '[data-product-id], [data-product-handle], .product-card-wrapper, .card-wrapper, product-page, product-card, product-price, [data-pid], product-info, floating-product'
   const savedSelectors = singleProductContainer // assumed to be an array
   const input = document.getElementById(inputId)
   const userInputSelector = input?.value?.trim()
@@ -3425,6 +3403,19 @@ function getProductInfoFromElement(el, inputId) {
     }
   }
 
+  // 🔹 Ignore nested product-card elements inside a container
+  if (container && container.tagName === 'PRODUCT-PAGE') {
+    const closestCard = el.closest('product-card')
+    if (
+      closestCard &&
+      closestCard !== el &&
+      !container.isSameNode(closestCard)
+    ) {
+      // The element is inside a nested product-card in a main product-page → skip
+      return null
+    }
+  }
+
   // 4. Set input value based on which matched
   if (container && input && matchedSelector && matchedFrom) {
     input.value = `${matchedSelector}`
@@ -3433,6 +3424,11 @@ function getProductInfoFromElement(el, inputId) {
   }
 
   // console.log('container', container)
+  // const targetCard = document.querySelector('product-card'); // find the element
+
+  // if (targetCard && container.contains(targetCard)) {
+  // 		container = null;
+  // }
 
   if (!container) return null
 
@@ -3440,18 +3436,50 @@ function getProductInfoFromElement(el, inputId) {
   const productId =
     container.getAttribute('data-product-id') ||
     container.getAttribute('data-pid')
-  const productHandle =
+
+  let productHandle =
     container.getAttribute('data-product-handle') ||
     container.getAttribute('data-handle')
+
+  let selectedValue
+
+  // 🔽 Fallback 1: look for anchor href containing /products/
+  if (!productHandle) {
+    const anchor = container.querySelector('a[href*="/products/"]')
+    if (anchor) {
+      const href = anchor.getAttribute('href') || ''
+      const match = href.match(/\/products\/([^/?#]+)/) // capture handle
+      if (match) {
+        productHandle = match[1]
+      }
+    }
+
+    const selectEl = container.querySelector('select')
+    if (selectEl) {
+      selectedValue = selectEl.options[selectEl.selectedIndex].value
+    }
+
+    if (el.classList.contains('js-option-price')) {
+      const parentLabel = el.closest('label') // find the wrapping label
+      if (!parentLabel) return
+
+      const parentInput = parentLabel.querySelector('input.js-product-option') // find input inside label
+      if (!parentInput) return
+
+      const value = parentInput.value
+      selectedValue = value
+    }
+  }
+
   // Get variantId from URL if on a product page
   let variantId = null
   const pathname = window.location.pathname
   const urlParams = new URLSearchParams(window.location.search)
   if (pathname.includes('/products/')) {
-    variantId = urlParams.get('variant')
     if (!variantId) {
+      variantId = urlParams.get('variant')
+    } else {
       variantId = firstVariant_product?.toString()
-      console.log('productVariant', variantId)
     }
   }
 
@@ -3463,7 +3491,7 @@ function getProductInfoFromElement(el, inputId) {
   }
 
   if (productId || productHandle || variantId) {
-    return { productId, productHandle, variantId, container }
+    return { productId, productHandle, variantId, container, selectedValue }
   }
 
   // 6. Fallback from product link
@@ -3498,6 +3526,8 @@ function updatePricesForPage(selector, isRegular, isbadge) {
   const selectedTestGroupId = selectEl.value
   if (!selectedTestGroupId) return
 
+  // console.log('selectedTestGroupId', selectedTestGroupId)
+
   const testingProducts = parsedPayload?.productInfo?.testingProducts || []
 
   // Normalize selector to an array of elements
@@ -3510,11 +3540,18 @@ function updatePricesForPage(selector, isRegular, isbadge) {
     elements = Array.from(document.querySelectorAll(selector))
   }
 
+  if (isRegular) {
+    // Add .js-option-price elements individually
+    const hover_btn_price = document.querySelectorAll('.js-option-price')
+    elements.push(...hover_btn_price)
+  }
+
   // console.log('elements', elements)
 
   if (!elements.length) return
 
   elements.forEach((el) => {
+    // console.log('el', el)
     let inputId
     if (!isbadge) {
       inputId = isRegular
@@ -3525,9 +3562,9 @@ function updatePricesForPage(selector, isRegular, isbadge) {
     }
     const productInfo = getProductInfoFromElement(el, inputId)
 
-    // console.log('productInfo', productInfo)
     // console.log('testingproducts', testingProducts)
     if (!productInfo) return
+    // console.log('productInfo', productInfo)
 
     const matchedProduct = testingProducts.find((p) => {
       const testGroupMatch = (p.testId || p.name) === selectedTestGroupId
@@ -3536,23 +3573,32 @@ function updatePricesForPage(selector, isRegular, isbadge) {
 
       if (window.location.pathname.includes('/products/')) {
         // If variantId exists, only match by variant
-        if (selected_variant_name) {
-          return p.variantName === selected_variant_name
-        } else if (productInfo.variantId) {
-          // console.log('productVariant', productInfo.variantId)
-          return p.variantId === productInfo.variantId
+        if (p.productId === productInfo.productId) {
+          if (selected_variant_name) {
+            // console.log('selected_variant_name', selected_variant_name)
+            const productVarinat = `${p.productHandle}_${p.variantName}`
+            // console.log('variantName', productVarinat === selected_variant_name)
+            return productVarinat === selected_variant_name
+          } else if (productInfo.variantId) {
+            return p.variantId === productInfo.variantId
+          }
         }
       }
-
+      if (productInfo.selectedValue) {
+        return (
+          p.productHandle === productInfo.productHandle &&
+          p.variantName === productInfo.selectedValue
+        )
+      }
       // Fallback to productId or handle
       return (
         p.productId === productInfo.productId ||
         p.productHandle === productInfo.productHandle
       )
     })
-    // console.log('matchedProduct', matchedProduct)
 
     if (!matchedProduct) return
+    // console.log('matchedProduct', matchedProduct)
 
     if (!isbadge) {
       const priceValue = isRegular
@@ -3565,7 +3611,6 @@ function updatePricesForPage(selector, isRegular, isbadge) {
       const formattedPrice = formatedPriceWithCurrency(
         parseFloat(priceValue) * 100
       )
-      // console.log('el', el)
 
       safelyUpdatePrice(el, formattedPrice, false)
     } else {
@@ -3578,6 +3623,8 @@ function updatePricesForPage(selector, isRegular, isbadge) {
           parseFloat(matchedProduct?.compareAtPrice)) *
           100
       )
+
+      // console.log('discountPercentage', discountPercentage)
       // console.log('badgeOrginalText', badgeOrginalText)
       // const classified = classifyLabel(badgeOrginalText)
       const badgeText = badgeOrginalText.trim()
@@ -3647,6 +3694,7 @@ function safelyUpdatePrice(el, formattedPrice, isbadge, attempt = 0) {
 
   // If element is still in DOM, try setting price
   if (document.body.contains(el)) {
+    // console.log('el', el)
     updatedDom.push(el)
     el.innerText = formattedPrice
     if (!isbadge) {
@@ -3687,19 +3735,203 @@ function highlightChange(element) {
 
 document
   .querySelectorAll(
-    'input[name="id"], input[type="radio"][data-variant-id], select[name="id"],.js-product-option'
+    'input[name="id"], input[type="radio"], input[type="radio"][data-variant-id], select[name="id"],.js-product-option'
   )
   .forEach((select) => {
     select.addEventListener('change', () => {
       // console.log('variant change');
       if (parsedPayload?.appName === 'Signal') {
-        selected_variant_name = select.value
+        const selectedHandle = select.getAttribute('data-handle')
+        // console.log('selectedHandle', selectedHandle)
+        selected_variant_name = selectedHandle
+          ? `${selectedHandle}_${select.value}`
+          : null
+
+        // console.log('reqularEl', regularEl)
+        // console.log('compareEl', compareEl)
 
         // Wait for theme DOM update to complete before updating price
         setTimeout(() => {
-          if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
-          if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+          if (regularEl) updatePricesForPage(regularPriceClassOrId, true, false)
+          if (compareEl)
+            updatePricesForPage(comparePriceClassOrId, false, false)
+          if (badgeEl) updatePricesForPage(badgeClassOrId, false, true)
         }, 600) // 600ms is a safe delay for themes like Horizon
       }
     })
   })
+
+// function preview_setupSearchAndModalListeners() {
+//   consoleLog('Setting up search and modal listeners')
+
+//   // Listen for search input changes
+//   document.addEventListener('input', (event) => {
+//     try {
+//       const searchInput = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId.join(',')},`
+//             : ''
+//         } input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+//       )
+//       if (!searchInput) return
+//       // Update prices after a short delay to allow search results to load
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search input handler:', error)
+//     }
+//   })
+
+//   // Listen for search form submissions
+//   document.addEventListener('submit', (event) => {
+//     try {
+//       const searchForm = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId.join(',')},`
+//             : ''
+//         } form[action*="query"]`
+//       )
+//       if (!searchForm) return
+
+//       // Update prices after form submission
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search form handler:', error)
+//     }
+//   })
+
+//   // Listen for clicks on search results
+//   document.addEventListener('click', (event) => {
+//     try {
+//       const searchResult = event.target.closest(
+//         `${
+//           searchClassOrId?.length > 0
+//             ? `${searchClassOrId?.join(',')},`
+//             : ''
+//         } .slider--search-presets, input[type="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"]`
+//       )
+//       if (!searchResult) return
+
+//       // Update prices when a search result is clicked
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search result click handler:', error)
+//     }
+//   })
+
+//   // Listen for modal open events
+//   document.addEventListener('click', (event) => {
+//     try {
+//       const modalTrigger = event.target.closest(
+//         `${
+//           modalClassOrId?.length > 0
+//             ? `${modalClassOrId.join(',')},`
+//             : ''
+//         } [data-modal-trigger],.predictive-search, [data-drawer-trigger], [aria-controls*="modal"], [aria-controls*="drawer"], modal-opener, [aria-haspopup="dialog"], [data-modal]`
+//       )
+//       if (!modalTrigger) return
+
+//       // Get the specific modal ID from the trigger
+//       let modalId = null
+//       if (modalTrigger.hasAttribute('data-modal')) {
+//         modalId = modalTrigger.getAttribute('data-modal')
+//       } else if (modalTrigger.closest('modal-opener')) {
+//         modalId = modalTrigger
+//           .closest('modal-opener')
+//           .getAttribute('data-modal')
+//       } else if (modalTrigger.hasAttribute('aria-controls')) {
+//         modalId = modalTrigger.getAttribute('aria-controls')
+//       }
+
+//       // Update prices when a modal is opened
+//       setTimeout(() => {
+//         try {
+//           // Find the open modal
+//           const openModal = document.querySelector('quick-add-modal[open]')
+//           if (openModal) {
+//             consoleLog('Found Open Modal:', openModal)
+
+//             // Get the product info from the open modal
+//             const productInfo = openModal.querySelector('product-info')
+//             if (productInfo) {
+//               const productId = productInfo.getAttribute('data-product-id')
+
+//               // Get the variant ID from the form
+//               const form = openModal.querySelector(
+//                 'form[action*="/cart/add"]'
+//               )
+//               if (form) {
+//                 const variantInput = form.querySelector('input[name="id"]')
+//                 if (variantInput) {
+//                   const variantId = variantInput.value
+
+//                   // Update prices for this specific product/variant
+//                   if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 									if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//                 }
+//               }
+//             }
+//           }
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in modal trigger handler:', error)
+//     }
+//   })
+
+//   // Listen for Shopify's predictive search results
+//   document.addEventListener('predictive-search:render', () => {
+//     try {
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in predictive search handler:', error)
+//     }
+//   })
+
+//   // Listen for custom search events that might be added by themes
+//   document.addEventListener('search:results', () => {
+//     try {
+//       setTimeout(() => {
+//         try {
+//           if (regularEl) updatePricesForPage(regularPriceClassOrId, true)
+// 					if (compareEl) updatePricesForPage(comparePriceClassOrId, false)
+//         } catch (error) {
+//           console.error('Error updating prices:', error)
+//         }
+//       }, 1500)
+//     } catch (error) {
+//       console.error('Error in search results handler:', error)
+//     }
+//   })
+// }
