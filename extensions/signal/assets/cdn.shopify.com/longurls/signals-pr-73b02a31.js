@@ -43,6 +43,7 @@ productContainerTest = [
     productCardContainer: [
       ...new Set([
         ...customSelectors.productCardContainer
+
         // ...defaultSelectors.productContainer
       ])
     ],
@@ -408,7 +409,6 @@ function splitSelectors(selectorArray) {
 }
 
 function hidePriceElements(priceElements) {
-  console.log(priceElements)
   if (!priceElements) return
   ;['compare', 'sale', 'badges'].forEach((type) => {
     const value = priceElements[type]
@@ -892,10 +892,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // )
     if (!productContainer) return
     const variantValue = variantInput.value
+    const handle = productContainer
+      .querySelector('a[href*="/products/"]')
+      .href.split('/')
+      .pop()
+      .split('?')[0]
     const matchingVariant = products.find((product) => {
       return (
-        // product.productHandle === productHandle &&
-        product.variantName === variantValue
+        product.productHandle === handle && product.variantName === variantValue
       )
     })
     if (!matchingVariant) {
@@ -1380,7 +1384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           //   // '.grid__item, .card-wrapper, .product-card-wrapper'
           //   '.card-wrapper'
           // )
-          console.log('updateProductPricesOnCard', productHandle)
           let productContainer = null
           for (const selector of possibleSelectors.productCardContainer) {
             if (
@@ -3015,7 +3018,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Remove them
     keysToRemove.forEach((key) => {
       localStorage.removeItem(key)
-      console.log(`🗑️ Removed localStorage key: ${key}`)
+      // console.log(`🗑️ Removed localStorage key: ${key}`)
     })
   }
 
@@ -3038,7 +3041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
   setTimeout(() => {
     revelAllHiddenPrices()
-  }, 600)
+  }, 1600)
   waitForProductPriceAndRun()
   setupPriceContainerObserver()
   setupSearchAndModalListeners()
@@ -3525,34 +3528,31 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return // skip text etc.
-
           // ✅ only run if it's a whole product card (adjust selector)
-          if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-            // console.log('📦 New product card added', node)
 
-            updateProductPricesOnCard(node) // pass the card
-
-            // setup add-to-cart on forms inside this card
-            if (node.matches('form[action*="/cart/add"]')) {
-              setupAddToCartButton(node)
-            }
-            node
-              .querySelectorAll('form[action*="/cart/add"]')
-              .forEach(setupAddToCartButton)
+          updateProductPricesOnCard() // pass the card
+          if (node.matches('form[action*="/cart/add"]')) {
+            setupAddToCartButton(node)
           }
+          node
+            .querySelectorAll('form[action*="/cart/add"]')
+            .forEach(setupAddToCartButton)
+          // if (node.matches(possibleSelectors.productCardContainer.join(','))) {
+          //   // setup add-to-cart on forms inside this card
+          // }
+          setTimeout(revelAllHiddenPrices, 1600)
         })
       }
 
       // 2) Existing card DOM changes (like price update)
-      // if (
-      //   mutation.type === 'characterData' ||
-      //   (mutation.type === 'attributes' &&
-      //     mutation.target.classList.contains('js-option-price'))
-      // ) {
-      //   return
-      // }
+      //   if (
+      //     mutation.type === 'characterData' ||
+      //     (mutation.type === 'attributes' &&
+      //       mutation.target.classList.contains('js-option-price'))
+      //   ) {
+      //     return
+      //   }
     })
-    setTimeout(revelAllHiddenPrices, 600)
   })
 
   // Start observing the document

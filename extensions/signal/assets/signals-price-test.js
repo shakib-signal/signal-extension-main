@@ -43,6 +43,7 @@ productContainerTest = [
     productCardContainer: [
       ...new Set([
         ...customSelectors.productCardContainer
+
         // ...defaultSelectors.productContainer
       ])
     ],
@@ -891,10 +892,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // )
     if (!productContainer) return
     const variantValue = variantInput.value
+    const handle = productContainer
+      .querySelector('a[href*="/products/"]')
+      .href.split('/')
+      .pop()
+      .split('?')[0]
     const matchingVariant = products.find((product) => {
       return (
-        // product.productHandle === productHandle &&
-        product.variantName === variantValue
+        product.productHandle === handle && product.variantName === variantValue
       )
     })
     if (!matchingVariant) {
@@ -3036,7 +3041,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
   setTimeout(() => {
     revelAllHiddenPrices()
-  }, 600)
+  }, 1600)
   waitForProductPriceAndRun()
   setupPriceContainerObserver()
   setupSearchAndModalListeners()
@@ -3523,21 +3528,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return // skip text etc.
-
           // ✅ only run if it's a whole product card (adjust selector)
-          if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-            // console.log('📦 New product card added', node)
 
-            updateProductPricesOnCard(node) // pass the card
-
-            // setup add-to-cart on forms inside this card
-            if (node.matches('form[action*="/cart/add"]')) {
-              setupAddToCartButton(node)
-            }
-            node
-              .querySelectorAll('form[action*="/cart/add"]')
-              .forEach(setupAddToCartButton)
+          updateProductPricesOnCard() // pass the card
+          if (node.matches('form[action*="/cart/add"]')) {
+            setupAddToCartButton(node)
           }
+          node
+            .querySelectorAll('form[action*="/cart/add"]')
+            .forEach(setupAddToCartButton)
+          // if (node.matches(possibleSelectors.productCardContainer.join(','))) {
+          //   // setup add-to-cart on forms inside this card
+          // }
+          setTimeout(revelAllHiddenPrices, 1600)
         })
       }
 
@@ -3550,7 +3553,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       //   return
       // }
     })
-    setTimeout(revelAllHiddenPrices, 600)
   })
 
   // Start observing the document
