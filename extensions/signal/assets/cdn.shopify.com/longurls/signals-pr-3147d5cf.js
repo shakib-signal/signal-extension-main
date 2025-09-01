@@ -949,6 +949,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
       // Update prices after a short delay to allow variant changes to complete
+
       setTimeout(() => {
         try {
           if (variantInput) {
@@ -1453,30 +1454,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Find matching containers for this product by anchor href
       productContainers.forEach((container) => {
-        const anchor = container.querySelector(
+        const anchor = container.querySelectorAll(
           `a[href*="/products/${productHandle}"]`
         )
-        if (!anchor) return
 
-        // Ensure anchor URL includes variant
-        if (anchor.tagName === 'A') {
-          const currentHref = new URL(anchor.href, window.location.origin)
-          currentHref.searchParams.set('variant', variantId)
-          anchor.href = currentHref.toString()
-        }
+        if (!anchor.length) return
 
-        // Update main product price
-        const priceElements = findPriceElements(container)
-        updatePriceElements(
-          priceElements,
-          price,
-          compareAtPrice,
-          discountAmount,
-          discountPercentage
-        )
+        // Check if this is the exact product match (not a partial match)
+        anchor.forEach((a) => {
+          const href = a.href || a.getAttribute('href')
+          const url = new URL(href, window.location.origin)
+          const pathSegments = url.pathname.split('/')
+          const productsIndex = pathSegments.indexOf('products')
 
-        // Update variant option prices (radio buttons inside the card)
-        updateVariantPricesOnCard(container, productHandle)
+          // Make sure 'products' exists in the path and there's a handle after it
+          if (productsIndex === -1 || productsIndex + 1 >= pathSegments.length)
+            return
+
+          const productHandleFromUrl = pathSegments[productsIndex + 1]
+
+          // Only proceed if this is an exact product handle match
+          if (productHandleFromUrl !== productHandle) return
+
+          // Ensure anchor URL includes variant
+          if (a.tagName == 'A') {
+            const currentHref = new URL(a.href, window.location.origin)
+            currentHref.searchParams.set('variant', variantId)
+            a.href = currentHref.toString()
+          }
+
+          // Update main product price
+          const priceElements = findPriceElements(container)
+          updatePriceElements(
+            priceElements,
+            price,
+            compareAtPrice,
+            discountAmount,
+            discountPercentage
+          )
+
+          // Update variant option prices (radio buttons inside the card)
+          updateVariantPricesOnCard(container, productHandle)
+        })
       })
     })
   }
@@ -3039,9 +3058,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error(e)
     }
   })
-  setTimeout(() => {
-    revelAllHiddenPrices()
-  }, 1600)
+  // setTimeout(() => {
+  //   revelAllHiddenPrices()
+  // }, 1600)
   waitForProductPriceAndRun()
   setupPriceContainerObserver()
   setupSearchAndModalListeners()
@@ -3514,6 +3533,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (node.matches('form[action*="/cart/add"]')) {
             setupAddToCartButton(node)
           }
+          if (node.matches('.js-variant-change')) {
+            console.log(node)
+            setupAddToCartButton(node)
+          }
           // Check for forms inside the added node
           node
             .querySelectorAll('form[action*="/cart/add"]')
@@ -3525,10 +3548,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       // 1) New product cards added
+
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return // skip text etc.
-          // ✅ only run if it's a whole product card (adjust selector)
+
+          // Check for variant change elements
+          if (node.matches('.js-variant-change')) {
+            const variantId = node.getAttribute('data-variant-id')
+            const matchedProduct = products.find(
+              (p) => p.variantId === variantId
+            )
+
+            if (matchedProduct) {
+              // console.log(
+              //   'Variant change element detected in main observer:',
+              //   node
+              // )
+              // Add our add-to-cart functionality directly to the existing node
+              setupVariantChangeAddToCart(node, variantId)
+            }
+          }
 
           updateProductPricesOnCard() // pass the card
           if (node.matches('form[action*="/cart/add"]')) {
@@ -3545,15 +3585,181 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // 2) Existing card DOM changes (like price update)
-      //   if (
-      //     mutation.type === 'characterData' ||
-      //     (mutation.type === 'attributes' &&
-      //       mutation.target.classList.contains('js-option-price'))
-      //   ) {
-      //     return
-      //   }
+      // if (
+      //   mutation.type === 'characterData' ||
+      //   (mutation.type === 'attributes' &&
+      //     mutation.target.classList.contains('js-option-price'))
+      // ) {
+      //   return
+      // }
     })
   })
+
+  // Function to setup add-to-cart functionality for variant change elements
+  function setupVariantChangeAddToCart(variantNode, variantId) {
+    if (!variantNode || !variantId) return
+
+    // Prevent multiple bindings on the same node
+    if (variantNode.dataset && variantNode.dataset.siBound === '1') return
+    if (variantNode.dataset) variantNode.dataset.siBound = '1'
+
+    console.log('Setting up add-to-cart for variant:', variantId)
+
+    // Add click event listener to the variant node with capture phase to ensure it runs first
+    variantNode.addEventListener(
+      'click',
+      function (event) {
+        // Prevent the default behavior and stop propagation to ensure only our code runs
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        // Deselect previously selected variant in this popup group
+        const groupEl =
+          variantNode.closest('animate-small-slide') ||
+          variantNode.closest('.js-variant-popup-cart') ||
+          document
+        groupEl
+          .querySelectorAll('.js-variant-change.selected')
+          .forEach((el) => {
+            if (el !== variantNode) el.classList.remove('selected')
+          })
+        // Select current
+        variantNode.classList.add('selected')
+
+        console.log('Variant clicked, adding to cart:', variantId)
+
+        // Get the experiments data
+        const experiments = JSON.parse(
+          localStorage.getItem('signal_active_experiments') || 'null'
+        )
+        const experimentPairs = []
+
+        // Theme Test
+        const themeExp = experiments?.experiments?.find((e) => e.theme)
+        if (themeExp?.theme?.experimentId && themeExp?.theme?.testId) {
+          experimentPairs.push(
+            `${themeExp.theme.experimentId}_${themeExp.theme.testId}`
+          )
+        }
+
+        // Image Test
+        const imageTestExp = products
+          .filter((p) => p.experimentType === 'image_testing')
+          .find((p) => p.variantId === variantId)
+
+        if (imageTestExp) {
+          experimentPairs.push(
+            `${imageTestExp.experimentId}_${imageTestExp.testId}`
+          )
+        }
+
+        // Price Test
+        const priceTestExp = products
+          .filter((p) => p.experimentType === 'price_testing')
+          .find((p) => p.variantId === variantId)
+
+        const discountAmount = parseFloat(
+          priceTestExp?.discountAmount || 0
+        ).toFixed(2)
+        const price = parseFloat(priceTestExp?.price || 0).toFixed(2)
+        const experimentId = priceTestExp?.experimentId
+        const testId = priceTestExp?.testId
+
+        if (experimentId && testId) {
+          experimentPairs.push(`${experimentId}_${testId}`)
+        }
+
+        const userSession = JSON.parse(
+          localStorage.getItem('signal_user_session') || 'null'
+        )
+        const userId = userSession?.clientId
+
+        const experimentString = experimentPairs.join(',')
+
+        // If no experiments, let the default behavior happen
+        if (experimentString === '') {
+          console.log(
+            'No experiment found. Letting default behavior handle Add to Cart.'
+          )
+          return
+        }
+
+        // Show loading spinner inside this variant card
+        const loadingEl = variantNode.querySelector('.js-loading')
+        if (loadingEl) {
+          loadingEl.classList.add('is-loading')
+        }
+
+        const properties = {
+          __si_p: price,
+          __si_d: discountAmount,
+          __si_ud: userId,
+          __si_exp: experimentString
+        }
+
+        // Use your existing add-to-cart logic
+        fetch('/cart/add.js', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: variantId,
+            quantity: 1,
+            sections: 'header,cart-drawer,cart-page,cart-json',
+            properties: {
+              __si_exp: JSON.stringify(properties)
+            }
+          })
+        })
+          .then(async () => {
+            await handleCartDrawerUpdate()
+
+            // Close the popup after successful cart addition using theme's existing transitions
+            const popup =
+              variantNode.closest('popup-modal') ||
+              variantNode.closest('.popup-modal') ||
+              document.querySelector('.popup-modal--variant-mob.open') ||
+              document.querySelector('.js-popup-cart-change.open')
+
+            if (popup) {
+              console.log(
+                'Closing variant popup after cart addition using theme transitions'
+              )
+
+              // Use theme's existing transition system - add opacity-0 for smooth fade out
+              popup.style.transition = 'opacity 0.3s ease-out'
+              popup.style.opacity = '0'
+
+              // Wait for transition to complete, then remove the popup
+              setTimeout(() => {
+                popup.classList.remove('open')
+                popup.style.removeProperty('z-index')
+                popup.style.removeProperty('opacity')
+                popup.style.removeProperty('transition')
+
+                // Also remove backdrop styles
+                const backdrop = popup.querySelector('.js-backdrop')
+                if (backdrop) {
+                  backdrop.style.removeProperty('z-index')
+                }
+              }, 300) // 300ms transition duration
+            }
+          })
+          .catch((error) => {
+            console.error('Error adding to cart:', error)
+          })
+          .finally(() => {
+            const loadingEl = variantNode.querySelector('.js-loading')
+            if (loadingEl) {
+              loadingEl.classList.remove('is-loading')
+            }
+          })
+      },
+      true
+    ) // Add capture phase parameter to ensure our listener runs first
+
+    // Add visual indication that this variant is clickable
+    // variantNode.style.cursor = 'pointer'
+  }
 
   // Start observing the document
   observer.observe(document.body, {
