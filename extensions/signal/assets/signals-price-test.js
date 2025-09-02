@@ -6,16 +6,6 @@ let possibleSelectors = {}
 let customSelectors = {}
 let sellingObj = {}
 
-const {
-  signal_rules,
-  selectors_data,
-  preview_data,
-  shop,
-  firstVariant_product,
-  signalMoneyFormat,
-  flicker_container_selectors
-} = window
-
 const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
