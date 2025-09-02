@@ -1720,6 +1720,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Description testing
+
+  function updateDescription(variantId, productDescription) {
+    const verifyProductPage = window.location.pathname.startsWith('/product')
+    if (!verifyProductPage) return
+    const productElement = document.querySelector('[data-product-id]')
+    const firstVariantId = firstVariant_product
+    let productIdDom
+    // if (productElement) {
+    //   productIdDom = productElement.getAttribute('data-product-id')
+    // }
+    if (variantId == firstVariantId) {
+      const productDescriptionSelector = document.querySelector(
+        selectors?.textClassOrId
+      )
+      if (productDescriptionSelector) {
+        productDescriptionSelector.innerHTML = productDescription
+      }
+    }
+  }
+
   // ✅ Track variant URL changes
   function onVariantUrlChange(callback) {
     const pushState = history.pushState
@@ -1858,6 +1879,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { testId: experiment.controlGroup, name: 'Control' }
   }
 
+  const runTestBasedOnType = (type, newProducts) => {
+    switch (type) {
+      case 'price_testing':
+        updateProductPrices()
+        break
+      case 'image_testing':
+        for (const product of newProducts) {
+          updateProductImages(
+            product?.productId,
+            product?.productHandle,
+            product?.imageUrl,
+            true
+          )
+        }
+        break
+      case 'product_description':
+        for (const product of newProducts) {
+          updateDescription(product.variantId, product.productDescription)
+        }
+        break
+
+      default:
+        break
+    }
+  }
+
   async function switchTestByUser(experiment, experiments) {
     const now = Date.now()
 
@@ -1883,7 +1930,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
-      updateProductPrices()
+      runTestBasedOnType(experiment?.experimentType, newProducts)
     }
     const trouthy = endDate
       ? now >= startDate && now <= endDate
@@ -1943,17 +1990,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newProducts = applyTestPrices(experiment, activeTest)
       products.push(...newProducts)
       storeExperimentData(experiments, products, utmParams)
-      updateProductPrices()
-      for (const product of newProducts) {
-        if (product?.imageUrl) {
-          updateProductImages(
-            product?.productId,
-            product?.productHandle,
-            product?.imageUrl,
-            true
-          )
-        }
-      }
+      runTestBasedOnType(experiment?.experimentType, newProducts)
 
       // Schedule reset at experiment end
       let resetTime = new Date(endDate).getTime() - now
@@ -2015,17 +2052,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newProducts = applyTestPrices(experiment, currentTest.id)
 
         products.push(...newProducts)
-        updateProductPrices()
-        for (const product of newProducts) {
-          if (product?.imageUrl) {
-            updateProductImages(
-              product?.productId,
-              product?.productHandle,
-              product?.imageUrl,
-              true
-            )
-          }
-        }
+        runTestBasedOnType(experiment?.experimentType, newProducts)
       }
     }
 
@@ -2050,17 +2077,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
           const newProducts = applyTestPrices(experiment, nextTest.id)
           products.push(...newProducts)
-          updateProductPrices()
-          for (const product of newProducts) {
-            if (product?.imageUrl) {
-              updateProductImages(
-                product?.productId,
-                product?.productHandle,
-                product?.imageUrl,
-                true
-              )
-            }
-          }
+          runTestBasedOnType(experiment?.experimentType, newProducts)
         }
 
         scheduleNextTest(testIntervals, experiment, endDate)
@@ -2084,18 +2101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             experiment?.controlGroup
           )
           products.push(...newProducts)
-          updateProductPrices()
-          for (const product of newProducts) {
-            if (product?.imageUrl) {
-              updateProductImages(
-                product?.productId,
-                product?.productHandle,
-                product?.imageUrl,
-                true
-              )
-            }
-          }
-
+          runTestBasedOnType(experiment?.experimentType, newProducts)
           clearTimeout(timer)
         }, resetTime)
       }
@@ -2116,7 +2122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
-      updateProductPrices()
+      runTestBasedOnType(experiment?.experimentType, newProducts)
     }
     if (now >= startDate && now <= endDate) {
       experimentFound = true
@@ -3042,10 +3048,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // 🏁 **Run once on page load**
+  function fixMalformedJson(rawJson) {
+    // Escape quotes inside HTML tags only
+    const cleaned = rawJson.replace(
+      /<[^>]*>/g,
+      (tag) => tag.replace(/"/g, '\\"') // escape only inside tags
+    )
 
+    try {
+      return JSON.parse(cleaned)
+    } catch (err) {
+      console.error('❌ Still invalid JSON:', err.message)
+      throw err
+    }
+  }
   waitForUserSession(async () => {
     try {
-      const experiments = JSON.parse(signal_rules)
+      // Function to parse and clean HTML strings
+      const experiments = fixMalformedJson(signal_rules)
+
       clearTsSiKeys()
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
@@ -3058,9 +3079,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.error(e)
     }
   })
-  // setTimeout(() => {
-  //   revelAllHiddenPrices()
-  // }, 1600)
+  setTimeout(() => {
+    revelAllHiddenPrices()
+  }, 1800)
   waitForProductPriceAndRun()
   setupPriceContainerObserver()
   setupSearchAndModalListeners()
@@ -3339,6 +3360,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (imageTestExp) {
       experimentPairs.push(
         `${imageTestExp.experimentId}_${imageTestExp.testId}`
+      )
+    }
+
+    // Description Test
+    const descriptionTestExp = products
+      .filter((p) => p.experimentType === 'description_testing')
+      .find((p) => p.variantId === variantId)
+    if (descriptionTestExp) {
+      experimentPairs.push(
+        `${descriptionTestExp.experimentId}_${descriptionTestExp.testId}`
       )
     }
 
