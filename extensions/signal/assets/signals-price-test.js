@@ -1868,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           )
         }
         break
-      case 'product_description':
+      case 'description_testing':
         for (const product of newProducts) {
           updateDescription(product.variantId, product.productDescription)
         }
