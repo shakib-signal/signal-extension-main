@@ -50,7 +50,6 @@ let landingUrl = ''
 let PRODUCT_HANDLE = 'selected_product'
 let class_shop = window.Shopify.shop
 let selected_variant_name = null
-
 // Add this at the top of the file, after variable declarations
 // if (sessionStorage.getItem(ACTIVE_KEY)) {
 //     console.log("🚫 UniversalStoreClassPicker: Signal test is active, skipping...");

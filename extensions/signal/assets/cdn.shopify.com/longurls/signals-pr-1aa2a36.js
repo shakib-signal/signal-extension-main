@@ -132,20 +132,23 @@ const defaultImageSelectors = {
   productCardContainer: [
     '.card--standard',
     '.product-card',
-    '.grid-view-item.product-card'
+    '.grid-view-item.product-card',
+    '.product-card-wrapper'
   ],
   productCardImage: [
     '.card__media img',
     '.product-card__image',
     '.grid-view-item__image',
     '.product-media__image',
-    '.lazyloaded'
+    '.lazyloaded',
+    'picture img'
   ],
 
   singleProductContainer: [
     '[data-product-id]',
     '.product.product--large',
-    '.product-media-container' // Added for this theme
+    '.product-media-container', // Added for this theme
+    'product-page'
   ],
   singleProductImage: [
     '.product__media img',
@@ -154,13 +157,15 @@ const defaultImageSelectors = {
     '.product__media.media img',
     '.image-magnify-lightbox',
     '.product-media__image', // Main image selector for this theme
-    'slideshow-slide img' // Added for slides in carousel
+    'slideshow-slide img', // Added for slides in carousel
+    'picture img'
   ],
 
   singleProductMediaWrapper: [
     '.product__media-wrapper',
     '.product-media-container',
-    'slideshow-slide' // Added for this theme
+    'slideshow-slide', // Added for this theme
+    'slide-control'
   ],
 
   singleProductThumbnails: [
@@ -174,7 +179,7 @@ const defaultImageSelectors = {
   predictiveSearchImage: ['.predictive-search__image'],
 
   // Existing additional selectors
-  productCardInner: ['.card__inner'],
+  productCardInner: ['.card__inner', 'picture'],
   productCardMediaContainer: [
     '.card__media',
     '.grid-view-item__image-wrapper',
@@ -232,23 +237,12 @@ const imageSelectors = {
       ...defaultImageSelectors.productCardContentBlocks
     ])
   ],
-  productCardInner: [
-    ...new Set([
-      ...(customImageSelectors.productCardInner || []),
-      ...defaultImageSelectors.productCardInner
-    ])
-  ],
+  productCardInner: [...new Set([...defaultImageSelectors.productCardInner])],
   productCardMediaContainer: [
-    ...new Set([
-      ...(customImageSelectors.productCardMediaContainer || []),
-      ...defaultImageSelectors.productCardMediaContainer
-    ])
+    ...new Set([...defaultImageSelectors.productCardMediaContainer])
   ],
   productCardHeading: [
-    ...new Set([
-      ...(customImageSelectors.productCardHeading || []),
-      ...defaultImageSelectors.productCardHeading
-    ])
+    ...new Set([...defaultImageSelectors.productCardHeading])
   ]
 }
 
@@ -949,7 +943,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
       // Update prices after a short delay to allow variant changes to complete
-
       setTimeout(() => {
         try {
           if (variantInput) {
@@ -1454,48 +1447,30 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Find matching containers for this product by anchor href
       productContainers.forEach((container) => {
-        const anchor = container.querySelectorAll(
+        const anchor = container.querySelector(
           `a[href*="/products/${productHandle}"]`
         )
+        if (!anchor) return
 
-        if (!anchor.length) return
+        // Ensure anchor URL includes variant
+        if (anchor.tagName === 'A') {
+          const currentHref = new URL(anchor.href, window.location.origin)
+          currentHref.searchParams.set('variant', variantId)
+          anchor.href = currentHref.toString()
+        }
 
-        // Check if this is the exact product match (not a partial match)
-        anchor.forEach((a) => {
-          const href = a.href || a.getAttribute('href')
-          const url = new URL(href, window.location.origin)
-          const pathSegments = url.pathname.split('/')
-          const productsIndex = pathSegments.indexOf('products')
+        // Update main product price
+        const priceElements = findPriceElements(container)
+        updatePriceElements(
+          priceElements,
+          price,
+          compareAtPrice,
+          discountAmount,
+          discountPercentage
+        )
 
-          // Make sure 'products' exists in the path and there's a handle after it
-          if (productsIndex === -1 || productsIndex + 1 >= pathSegments.length)
-            return
-
-          const productHandleFromUrl = pathSegments[productsIndex + 1]
-
-          // Only proceed if this is an exact product handle match
-          if (productHandleFromUrl !== productHandle) return
-
-          // Ensure anchor URL includes variant
-          if (a.tagName == 'A') {
-            const currentHref = new URL(a.href, window.location.origin)
-            currentHref.searchParams.set('variant', variantId)
-            a.href = currentHref.toString()
-          }
-
-          // Update main product price
-          const priceElements = findPriceElements(container)
-          updatePriceElements(
-            priceElements,
-            price,
-            compareAtPrice,
-            discountAmount,
-            discountPercentage
-          )
-
-          // Update variant option prices (radio buttons inside the card)
-          updateVariantPricesOnCard(container, productHandle)
-        })
+        // Update variant option prices (radio buttons inside the card)
+        updateVariantPricesOnCard(container, productHandle)
       })
     })
   }
@@ -1723,15 +1698,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Description testing
 
   function updateDescription(variantId, productDescription) {
-    const verifyProductPage = window.location.pathname.startsWith('/product')
+    const verifyProductPage = window.location.pathname.includes('/products/')
     if (!verifyProductPage) return
-    const productElement = document.querySelector('[data-product-id]')
-    const firstVariantId = firstVariant_product
-    let productIdDom
-    // if (productElement) {
-    //   productIdDom = productElement.getAttribute('data-product-id')
-    // }
-    if (variantId == firstVariantId) {
+    const variantIdFromUrl = new URLSearchParams(window.location.search).get(
+      'variant'
+    )
+    const detectedVariantId = variantIdFromUrl ?? firstVariant_product
+
+    if (variantId == detectedVariantId) {
       const productDescriptionSelector = document.querySelector(
         selectors?.textClassOrId
       )
@@ -1894,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           )
         }
         break
-      case 'product_description':
+      case 'description_testing':
         for (const product of newProducts) {
           updateDescription(product.variantId, product.productDescription)
         }
@@ -2016,7 +1990,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         '%cNo active experiment found. Resetting prices.',
         'color: red;'
       )
-      updateProductPrices()
+      runTestBasedOnType(experiment?.experimentType, newProducts)
     }
   }
 
@@ -2102,6 +2076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           )
           products.push(...newProducts)
           runTestBasedOnType(experiment?.experimentType, newProducts)
+
           clearTimeout(timer)
         }, resetTime)
       }
@@ -2137,7 +2112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
         // Store active experiment data in local storage for web pixel
-        const activeTest = getStorage(experiment.id, 'active_ts')
 
         const utmParams = getUTMParams()
         storeExperimentData(experiments, products, utmParams)
@@ -2176,7 +2150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'color: red;'
       )
 
-      updateProductPrices()
+      runTestBasedOnType(experiment?.experimentType, newProducts)
     }
   }
 
@@ -2589,162 +2563,257 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (didUpdate) return true
 
       // --- OLD THEME: Product Detail Image ---
-      const productContainers = safeQueryAll(
-        imageSelectors.singleProductContainer
+      const matchedSelectors = singleProductContainer.filter((sel) =>
+        document.querySelector(sel)
       )
-      productContainers.forEach((productContainer) => {
-        const linkEl = productContainer.querySelector('a[href*="/products/"]')
-        if (!linkEl) return
-        const href = linkEl.getAttribute('href')
-        const handleInHref = href.split('/').pop()?.split('?')[0]
-        if (handleInHref !== productHandle) return
 
-        let mediaList = safeQuery(['.product__media-list'], productContainer)
-        if (!mediaList) {
-          mediaList = document.createElement('ul')
-          mediaList.className =
-            'product__media-list contains-media grid grid--peek list-unstyled slider slider--mobile'
-          mediaList.setAttribute('role', 'list')
+      if (matchedSelectors.includes('product-page')) {
+        const productContainers = safeQueryAll(
+          imageSelectors.singleProductContainer
+        )
 
-          const wrapper =
-            productContainer.querySelector('.product__media-wrapper') ||
-            productContainer.querySelector('.grid__item')
-          ;(wrapper || productContainer).appendChild(mediaList)
-        }
+        productContainers?.forEach((productContainer) => {
+          const linkEl = productContainer.querySelector('a[href*="/products/"]')
+          if (!linkEl) return
+          const href = linkEl.getAttribute('href')
+          const handleInHref = href.split('/').pop()?.split('?')[0]
+          // console.log('handleHref', handleInHref)
+          if (handleInHref !== productHandle) return
 
-        if (productContainer.classList.contains('product--no-media')) {
-          productContainer.classList.remove('product--no-media')
-          productContainer.classList.replace('grid--1-col', 'grid--2-col')
-        }
+          console.log('productContainer', productContainer)
 
-        let imgEl = safeQuery(imageSelectors.singleProductImage, mediaList)
-        if (!imgEl) {
-          const mediaItem = document.createElement('li')
-          mediaItem.className =
-            'product__media-item grid__item slider__slide is-active scroll-trigger animate--fade-in'
+          matchedSelectors.forEach((sel) => {
+            const container = document.querySelector(sel)
+            if (!container) return
 
-          const mediaContainer = document.createElement('div')
-          mediaContainer.className =
-            'product-media-container media-type-image media-fit-contain global-media-settings gradient constrain-height'
-          mediaContainer.style.setProperty('--ratio', '1.0')
+            let img = container.querySelector('picture img')
 
-          imgEl = document.createElement('img')
-          imgEl.className = 'product__media media media--transparent'
-          imgEl.style.objectFit = 'cover'
-          imgEl.style.width = '100%'
-          imgEl.style.height = '100%'
+            if (img && imageUrl) {
+              img.src = imageUrl
+              img.removeAttribute('data-src')
+              img.removeAttribute('data-srcset')
+              img.removeAttribute('srcset')
+              img.removeAttribute('sizes')
+              img.loading = 'eager'
+            }
+            // console.log('imges', img)
+          })
 
-          mediaContainer.appendChild(imgEl)
-          mediaItem.appendChild(mediaContainer)
-          mediaList.appendChild(mediaItem)
-        }
+          let pictureImg = productContainer.querySelector('picture img')
+          let flotingImg = productContainer.querySelector(
+            'floating-product ul li img'
+          )
 
-        if (!imgEl.dataset.originalSrc) {
-          imgEl.dataset.originalSrc = imgEl.src || ''
-          imgEl.dataset.originalSrcset = imgEl.srcset || ''
-        }
+          if (flotingImg) {
+            flotingImg.style.display = 'none'
+          }
 
-        imgEl.src = isActive && imageUrl ? imageUrl : imgEl.dataset.originalSrc
-        imgEl.srcset =
-          isActive && imageUrl ? imageUrl : imgEl.dataset.originalSrcset
-      })
+          if (pictureImg && imageUrl) {
+            pictureImg.src = imageUrl
+          }
+        })
+      } else {
+        const productContainers = safeQueryAll(
+          imageSelectors.singleProductContainer
+        )
+        console.log('productContainer', productContainers)
+
+        productContainers.forEach((productContainer) => {
+          const linkEl = productContainer.querySelector('a[href*="/products/"]')
+          if (!linkEl) return
+          const href = linkEl.getAttribute('href')
+          const handleInHref = href.split('/').pop()?.split('?')[0]
+          console.log('handleHref', handleInHref)
+          if (handleInHref !== productHandle) return
+
+          // console.log('productContainer', productContainer)
+
+          let pictureImg = productContainer.querySelector('picture img')
+          // console.log('picture', pictureImg)
+
+          if (pictureImg && imageUrl) {
+            pictureImg.src = imageUrl
+          }
+
+          let mediaList = safeQuery(['.product__media-list'], productContainer)
+          if (!mediaList) {
+            mediaList = document.createElement('ul')
+            mediaList.className =
+              'product__media-list contains-media grid grid--peek list-unstyled slider slider--mobile'
+            mediaList.setAttribute('role', 'list')
+
+            const wrapper =
+              productContainer.querySelector('.product__media-wrapper') ||
+              productContainer.querySelector('.grid__item')
+            ;(wrapper || productContainer).appendChild(mediaList)
+          }
+
+          if (productContainer.classList.contains('product--no-media')) {
+            productContainer.classList.remove('product--no-media')
+            productContainer.classList.replace('grid--1-col', 'grid--2-col')
+          }
+
+          let imgEl = safeQuery(imageSelectors.singleProductImage, mediaList)
+          // console.log('imgel', imgEl)
+          if (!imgEl) {
+            const mediaItem = document.createElement('li')
+            mediaItem.className =
+              'product__media-item grid__item slider__slide is-active scroll-trigger animate--fade-in'
+
+            const mediaContainer = document.createElement('div')
+            mediaContainer.className =
+              'product-media-container media-type-image media-fit-contain global-media-settings gradient constrain-height'
+            mediaContainer.style.setProperty('--ratio', '1.0')
+
+            imgEl = document.createElement('img')
+            imgEl.className = 'product__media media media--transparent'
+            imgEl.style.objectFit = 'cover'
+            imgEl.style.width = '100%'
+            imgEl.style.height = '100%'
+
+            mediaContainer.appendChild(imgEl)
+            mediaItem.appendChild(mediaContainer)
+            mediaList.appendChild(mediaItem)
+          }
+
+          if (!imgEl.dataset.originalSrc) {
+            imgEl.dataset.originalSrc = imgEl.src || ''
+            imgEl.dataset.originalSrcset = imgEl.srcset || ''
+          }
+
+          imgEl.src =
+            isActive && imageUrl ? imageUrl : imgEl.dataset.originalSrc
+          imgEl.srcset =
+            isActive && imageUrl ? imageUrl : imgEl.dataset.originalSrcset
+        })
+      }
 
       // --- OLD THEME: Modal Image ---
       updateModalImage(productHandle, imageUrl, true)
 
       // --- OLD THEME: Grid/List Product Cards ---
       const cardContainers = safeQueryAll(imageSelectors.productCardContainer)
+      // console.log('cardContainer', cardContainers)
+
       cardContainers.forEach((card) => {
         const linkEl = safeQuery(['a[href*="/products/"]'], card)
         if (!linkEl) return
 
         const href = linkEl.getAttribute('href')
         const handleInHref = href.split('/').pop()?.split('?')[0]
+        // console.log('handleInHref', handleInHref)
         if (handleInHref !== productHandle) return
 
         const cardInner = safeQuery(imageSelectors.productCardInner, card)
+        // console.log('cardInner', cardInner)
         if (!cardInner) return
 
-        let mediaContainer = safeQuery(
-          imageSelectors.productCardMediaContainer,
-          card
-        )
-        let mediaDiv = mediaContainer
-          ? safeQuery(imageSelectors.productCardMediaDiv, mediaContainer)
-          : null
-        let imgEl = mediaDiv ? safeQuery(['img'], mediaDiv) : null
+        let imgEl
+        let firstContentBlock
+        let secondContentBlock
 
-        const contentBlocks = card.querySelectorAll(
-          imageSelectors.productCardContentBlocks
-        )
-        const firstContentBlock = contentBlocks[0] || null
-        const secondContentBlock = contentBlocks[1] || null
-
-        if (secondContentBlock) {
-          secondContentBlock.style.display = 'block'
-          const heading = safeQuery(
-            imageSelectors.productCardHeading,
-            secondContentBlock
-          )
-          if (heading) heading.style.display = 'block'
-        }
-
-        if (!imgEl && isActive && imageUrl) {
-          if (!mediaContainer) {
-            mediaContainer = document.createElement('div')
-            mediaContainer.className = 'card__media'
-            cardInner.prepend(mediaContainer)
-          }
-
-          const existingImages = card.querySelectorAll(
-            'img:not([data-injected])'
-          )
-          existingImages.forEach((img) => {
-            img.style.display = 'none'
-          })
-
-          const clickableWrapper = document.createElement('a')
-          clickableWrapper.href = href
-          clickableWrapper.className = 'card__media-link'
-          clickableWrapper.setAttribute('aria-label', 'View product')
-
-          mediaDiv = document.createElement('div')
-          mediaDiv.className = 'media media--transparent'
-
-          imgEl = document.createElement('img')
-          imgEl.src = imageUrl
-          imgEl.alt = 'Product Image'
-          imgEl.className = 'motion-reduce'
-          imgEl.loading = 'lazy'
-          imgEl.dataset.injected = 'true'
-
-          mediaDiv.appendChild(imgEl)
-          clickableWrapper.appendChild(mediaDiv)
-          mediaContainer.appendChild(clickableWrapper)
-
-          if (firstContentBlock) firstContentBlock.style.display = 'none'
-          return
-        }
-
-        if (imgEl) {
-          if (!imgEl.dataset.originalSrc) {
-            imgEl.dataset.originalSrc = imgEl.src
-            imgEl.dataset.originalSrcset = imgEl.srcset || ''
-          }
-
-          if (isActive && imageUrl) {
+        if (cardInner && cardInner?.matches('picture')) {
+          imgEl = cardInner.querySelector('img')
+          // console.log('imgUrl', imageUrl)
+          if (imgEl && imageUrl) {
             imgEl.src = imageUrl
-            imgEl.srcset = imageUrl
-            if (firstContentBlock) firstContentBlock.style.display = 'none'
-          } else {
-            if (imgEl.dataset.injected === 'true') {
-              imgEl.remove()
-              if (mediaDiv && !mediaDiv.hasChildNodes()) mediaDiv.remove()
-            } else {
-              imgEl.src = imgEl.dataset.originalSrc
-              imgEl.srcset = imgEl.dataset.originalSrcset
+
+            // Prevent lazy loader from overriding it
+            imgEl.removeAttribute('data-src')
+            imgEl.removeAttribute('data-srcset')
+            imgEl.removeAttribute('srcset')
+            imgEl.removeAttribute('sizes')
+            imgEl.loading = 'eager'
+
+            imgEl.dataset.injected = 'true'
+            // console.log('imgEl', imgEl)
+            return
+          }
+        } else {
+          let mediaContainer = safeQuery(
+            imageSelectors.productCardMediaContainer,
+            card
+          )
+          console.log('mediaContainer', mediaContainer)
+          let mediaDiv = mediaContainer
+            ? safeQuery(imageSelectors.productCardMediaDiv, mediaContainer)
+            : null
+
+          console.log('mediaDiv', mediaDiv)
+          imgEl = mediaDiv ? safeQuery(['img', 'picture img'], mediaDiv) : null
+
+          const contentBlocks = card.querySelectorAll(
+            imageSelectors.productCardContentBlocks
+          )
+          firstContentBlock = contentBlocks[0] || null
+          secondContentBlock = contentBlocks[1] || null
+
+          if (secondContentBlock) {
+            secondContentBlock.style.display = 'block'
+            const heading = safeQuery(
+              imageSelectors.productCardHeading,
+              secondContentBlock
+            )
+            if (heading) heading.style.display = 'block'
+          }
+
+          if (!imgEl && isActive && imageUrl) {
+            if (!mediaContainer) {
+              mediaContainer = document.createElement('div')
+              mediaContainer.className = 'card__media'
+              cardInner.prepend(mediaContainer)
             }
-            if (firstContentBlock) firstContentBlock.style.display = 'block'
+
+            const existingImages = card.querySelectorAll(
+              'img:not([data-injected])'
+            )
+            existingImages.forEach((img) => {
+              img.style.display = 'none'
+            })
+
+            const clickableWrapper = document.createElement('a')
+            clickableWrapper.href = href
+            clickableWrapper.className = 'card__media-link'
+            clickableWrapper.setAttribute('aria-label', 'View product')
+
+            mediaDiv = document.createElement('div')
+            mediaDiv.className = 'media media--transparent'
+
+            imgEl = document.createElement('img')
+            imgEl.src = imageUrl
+            imgEl.alt = 'Product Image'
+            imgEl.className = 'motion-reduce'
+            imgEl.loading = 'lazy'
+            imgEl.dataset.injected = 'true'
+
+            mediaDiv.appendChild(imgEl)
+            clickableWrapper.appendChild(mediaDiv)
+            mediaContainer.appendChild(clickableWrapper)
+
+            if (firstContentBlock) firstContentBlock.style.display = 'none'
+            return
+          }
+
+          if (imgEl) {
+            if (!imgEl.dataset.originalSrc) {
+              imgEl.dataset.originalSrc = imgEl.src
+              imgEl.dataset.originalSrcset = imgEl.srcset || ''
+            }
+
+            if (isActive && imageUrl) {
+              imgEl.src = imageUrl
+              imgEl.srcset = imageUrl
+              if (firstContentBlock) firstContentBlock.style.display = 'none'
+            } else {
+              if (imgEl.dataset.injected === 'true') {
+                imgEl.remove()
+                if (mediaDiv && !mediaDiv.hasChildNodes()) mediaDiv.remove()
+              } else {
+                imgEl.src = imgEl.dataset.originalSrc
+                imgEl.srcset = imgEl.dataset.originalSrcset
+              }
+              if (firstContentBlock) firstContentBlock.style.display = 'block'
+            }
           }
         }
       })
@@ -3047,7 +3116,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   }
 
-  // 🏁 **Run once on page load**
   function fixMalformedJson(rawJson) {
     // Escape quotes inside HTML tags only
     const cleaned = rawJson.replace(
@@ -3062,11 +3130,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       throw err
     }
   }
+
+  // 🏁 **Run once on page load**
+
   waitForUserSession(async () => {
     try {
-      // Function to parse and clean HTML strings
       const experiments = fixMalformedJson(signal_rules)
-
       clearTsSiKeys()
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
@@ -3363,16 +3432,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
     }
 
-    // Description Test
-    const descriptionTestExp = products
-      .filter((p) => p.experimentType === 'description_testing')
-      .find((p) => p.variantId === variantId)
-    if (descriptionTestExp) {
-      experimentPairs.push(
-        `${descriptionTestExp.experimentId}_${descriptionTestExp.testId}`
-      )
-    }
-
     // Price Test
     const priceTestExp = products
       .filter((p) => p.experimentType === 'price_testing')
@@ -3550,56 +3609,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // })
 
   // old
+
   const observerX = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) {
-          updateProductPricesOnCard()
-          setTimeout(() => {
-            revelAllHiddenPrices()
-          }, 600)
-          // Element node
-
-          // Check if the added node is a form
-          if (node.matches('form[action*="/cart/add"]')) {
-            setupAddToCartButton(node)
-          }
-          if (node.matches('.js-variant-change')) {
-            console.log(node)
-            setupAddToCartButton(node)
-          }
-          // Check for forms inside the added node
-          node
-            .querySelectorAll('form[action*="/cart/add"]')
-            .forEach(setupAddToCartButton)
-        }
-      })
-    })
-  })
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
       // 1) New product cards added
-
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType !== 1) return // skip text etc.
-
-          // Check for variant change elements
-          if (node.matches('.js-variant-change')) {
-            const variantId = node.getAttribute('data-variant-id')
-            const matchedProduct = products.find(
-              (p) => p.variantId === variantId
-            )
-
-            if (matchedProduct) {
-              // console.log(
-              //   'Variant change element detected in main observer:',
-              //   node
-              // )
-              // Add our add-to-cart functionality directly to the existing node
-              setupVariantChangeAddToCart(node, variantId)
-            }
-          }
+          // ✅ only run if it's a whole product card (adjust selector)
 
           updateProductPricesOnCard() // pass the card
           if (node.matches('form[action*="/cart/add"]')) {
@@ -3634,8 +3651,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (variantNode.dataset && variantNode.dataset.siBound === '1') return
     if (variantNode.dataset) variantNode.dataset.siBound = '1'
 
-    console.log('Setting up add-to-cart for variant:', variantId)
-
     // Add click event listener to the variant node with capture phase to ensure it runs first
     variantNode.addEventListener(
       'click',
@@ -3656,8 +3671,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           })
         // Select current
         variantNode.classList.add('selected')
-
-        console.log('Variant clicked, adding to cart:', variantId)
 
         // Get the experiments data
         const experiments = JSON.parse(
@@ -3752,10 +3765,6 @@ document.addEventListener('DOMContentLoaded', async () => {
               document.querySelector('.js-popup-cart-change.open')
 
             if (popup) {
-              console.log(
-                'Closing variant popup after cart addition using theme transitions'
-              )
-
               // Use theme's existing transition system - add opacity-0 for smooth fade out
               popup.style.transition = 'opacity 0.3s ease-out'
               popup.style.opacity = '0'
@@ -3791,6 +3800,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add visual indication that this variant is clickable
     // variantNode.style.cursor = 'pointer'
   }
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // 1) New product cards added
+
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType !== 1) return // skip text etc.
+
+          // Check for variant change elements
+          if (node.matches('.js-variant-change')) {
+            const variantId = node.getAttribute('data-variant-id')
+            const matchedProduct = products.find(
+              (p) => p.variantId === variantId
+            )
+
+            if (matchedProduct) {
+              // console.log(
+              //   'Variant change element detected in main observer:',
+              //   node
+              // )
+              // Add our add-to-cart functionality directly to the existing node
+              setupVariantChangeAddToCart(node, variantId)
+            }
+          }
+
+          updateProductPricesOnCard() // pass the card
+          if (node.matches('form[action*="/cart/add"]')) {
+            setupAddToCartButton(node)
+          }
+          node
+            .querySelectorAll('form[action*="/cart/add"]')
+            .forEach(setupAddToCartButton)
+          // if (node.matches(possibleSelectors.productCardContainer.join(','))) {
+          //   // setup add-to-cart on forms inside this card
+          // }
+          setTimeout(revelAllHiddenPrices, 1600)
+        })
+      }
+
+      // 2) Existing card DOM changes (like price update)
+      // if (
+      //   mutation.type === 'characterData' ||
+      //   (mutation.type === 'attributes' &&
+      //     mutation.target.classList.contains('js-option-price'))
+      // ) {
+      //   return
+      // }
+    })
+  })
 
   // Start observing the document
   observer.observe(document.body, {

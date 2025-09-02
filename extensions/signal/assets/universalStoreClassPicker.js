@@ -66,7 +66,7 @@ const universel_ACTIVE_KEY = 'signal_test_info'
 let universel_activeTab = null
 let universel_isLoading = false
 let universel_updatedDom = []
-let universel_shop = window.Shopify.shop
+let universel_shop = shop
 
 // Add this at the top of the file, after variable declarations
 // if (sessionStorage.getItem(universel_ACTIVE_KEY)) {
