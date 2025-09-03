@@ -5,13 +5,13 @@ let productContainerTest = []
 let possibleSelectors = {}
 let customSelectors = {}
 let sellingObj = {}
-
+let shippingExp = {}
 const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
 const flicker_selectors = flicker_container_selectors
 // Get custom selectors from theme settings
-const all_selectors = JSON.parse(selectors_data)
+const all_selectors = selectors_data
 const selectors = all_selectors?.find(
   (selector) => selector.themeId == current_themeId
 )?.selectors
@@ -1854,7 +1854,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return { testId: experiment.controlGroup, name: 'Control' }
   }
 
-  const runTestBasedOnType = (type, newProducts) => {
+  const runTestBasedOnType = (type, newProducts, expData) => {
     switch (type) {
       case 'price_testing':
         updateProductPrices()
@@ -1874,9 +1874,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           updateDescription(product.variantId, product.productDescription)
         }
         break
+      case 'shipping_testing':
+        shippingExp = expData
+        break
 
       default:
         break
+    }
+  }
+
+  const experimentWithTest = (experiment, testId) => {
+    return {
+      id: experiment.id,
+      name: experiment.name,
+      experimentType: experiment.experimentType,
+      testId: testId
     }
   }
 
@@ -1905,7 +1917,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
-      runTestBasedOnType(experiment?.experimentType, newProducts)
+      const activeExpData = experimentWithTest(
+        experiment,
+        experiment?.controlGroup
+      )
+      runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
     const trouthy = endDate
       ? now >= startDate && now <= endDate
@@ -1964,8 +1980,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const utmParams = getUTMParams()
       const newProducts = applyTestPrices(experiment, activeTest)
       products.push(...newProducts)
+      const activeExpData = experimentWithTest(experiment, activeTest)
       storeExperimentData(experiments, products, utmParams)
-      runTestBasedOnType(experiment?.experimentType, newProducts)
+      runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
 
       // Schedule reset at experiment end
       let resetTime = new Date(endDate).getTime() - now
@@ -1991,7 +2008,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         '%cNo active experiment found. Resetting prices.',
         'color: red;'
       )
-      runTestBasedOnType(experiment?.experimentType, newProducts)
+      ignoreTest()
     }
   }
 
@@ -2025,9 +2042,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         )
 
         const newProducts = applyTestPrices(experiment, currentTest.id)
-
+        const activeExpData = experimentWithTest(experiment, currentTest.id)
         products.push(...newProducts)
-        runTestBasedOnType(experiment?.experimentType, newProducts)
+        runTestBasedOnType(
+          experiment?.experimentType,
+          newProducts,
+          activeExpData
+        )
       }
     }
 
@@ -2046,14 +2067,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       setStorage(experiment.id, 'next_ts_time', nextTestTime)
 
       const timer = setTimeout(() => {
-        if (isUTMAllowed(experiment)) {
-          setStorage(experiment.id, 'active_ts', nextTest.id)
-          setStorage(experiment.id, 'last_ts_switch', Date.now())
+        // if (isUTMAllowed(experiment)) {
+        //   setStorage(experiment.id, 'active_ts', nextTest.id)
+        //   setStorage(experiment.id, 'last_ts_switch', Date.now())
 
-          const newProducts = applyTestPrices(experiment, nextTest.id)
-          products.push(...newProducts)
-          runTestBasedOnType(experiment?.experimentType, newProducts)
-        }
+        //   const newProducts = applyTestPrices(experiment, nextTest.id)
+        //   products.push(...newProducts)
+        //   runTestBasedOnType(experiment?.experimentType, newProducts)
+        // }
 
         scheduleNextTest(testIntervals, experiment, endDate)
       }, nextTestTime - now)
@@ -2076,7 +2097,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             experiment?.controlGroup
           )
           products.push(...newProducts)
-          runTestBasedOnType(experiment?.experimentType, newProducts)
+          const activeExpData = experimentWithTest(
+            experiment,
+            experiment?.controlGroup
+          )
+          runTestBasedOnType(
+            experiment?.experimentType,
+            newProducts,
+            activeExpData
+          )
 
           clearTimeout(timer)
         }, resetTime)
@@ -2098,7 +2127,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
-      runTestBasedOnType(experiment?.experimentType, newProducts)
+      const activeExpData = experimentWithTest(
+        experiment,
+        experiment?.controlGroup
+      )
+      runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
     if (now >= startDate && now <= endDate) {
       experimentFound = true
@@ -2151,7 +2184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'color: red;'
       )
 
-      runTestBasedOnType(experiment?.experimentType, newProducts)
+      ignoreTest()
     }
   }
 
@@ -2581,8 +2614,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           // console.log('handleHref', handleInHref)
           if (handleInHref !== productHandle) return
 
-          console.log('productContainer', productContainer)
-
           matchedSelectors.forEach((sel) => {
             const container = document.querySelector(sel)
             if (!container) return
@@ -2617,14 +2648,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const productContainers = safeQueryAll(
           imageSelectors.singleProductContainer
         )
-        console.log('productContainer', productContainers)
 
         productContainers.forEach((productContainer) => {
           const linkEl = productContainer.querySelector('a[href*="/products/"]')
           if (!linkEl) return
           const href = linkEl.getAttribute('href')
           const handleInHref = href.split('/').pop()?.split('?')[0]
-          console.log('handleHref', handleInHref)
+
           if (handleInHref !== productHandle) return
 
           // console.log('productContainer', productContainer)
@@ -2735,12 +2765,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             imageSelectors.productCardMediaContainer,
             card
           )
-          console.log('mediaContainer', mediaContainer)
           let mediaDiv = mediaContainer
             ? safeQuery(imageSelectors.productCardMediaDiv, mediaContainer)
             : null
 
-          console.log('mediaDiv', mediaDiv)
           imgEl = mediaDiv ? safeQuery(['img', 'picture img'], mediaDiv) : null
 
           const contentBlocks = card.querySelectorAll(
@@ -3136,7 +3164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   waitForUserSession(async () => {
     try {
-      const experiments = fixMalformedJson(signal_rules)
+      const experiments = signal_rules
       clearTsSiKeys()
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
@@ -3430,6 +3458,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (imageTestExp) {
       experimentPairs.push(
         `${imageTestExp.experimentId}_${imageTestExp.testId}`
+      )
+    }
+
+    const shippingExp = experiments?.experiments?.find(
+      (e) => e.experimentType == 'shipping_testing'
+    )
+    if (shippingExp?.shipping?.experimentId && shippingExp?.shipping?.testId) {
+      experimentPairs.push(
+        `${shippingExp.shipping.experimentId}_${shippingExp.shipping.testId}`
       )
     }
 

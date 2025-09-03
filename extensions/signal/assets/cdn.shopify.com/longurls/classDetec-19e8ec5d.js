@@ -102,7 +102,7 @@ async function getDataFromUrl() {
   console.log('✅ Payload from URL:', payload)
 
   if (payload?.appName == 'Signal') {
-    const productData = JSON.parse(preview_data)
+    const productData = preview_data
     console.log('data', productData)
     const updatedPayload = {
       experimentName: payload.experimentName,

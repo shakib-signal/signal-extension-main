@@ -10,7 +10,7 @@ const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
 const flicker_selectors = flicker_container_selectors
 // Get custom selectors from theme settings
-const all_selectors = JSON.parse(selectors_data)
+const all_selectors = selectors_data
 const selectors = all_selectors?.find(
   (selector) => selector.themeId == current_themeId
 )?.selectors
@@ -3135,7 +3135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   waitForUserSession(async () => {
     try {
-      const experiments = fixMalformedJson(signal_rules)
+      const experiments = signal_rules
       clearTsSiKeys()
       experiments.forEach(async (experiment) => {
         if (experiment.schedule.method == 'time-based') {
@@ -3429,6 +3429,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (imageTestExp) {
       experimentPairs.push(
         `${imageTestExp.experimentId}_${imageTestExp.testId}`
+      )
+    }
+
+    const shippingExp = experiments?.experiments?.find(
+      (e) => e.experimentType == 'shipping_testing'
+    )
+    if (shippingExp?.shipping?.experimentId && shippingExp?.shipping?.testId) {
+      experimentPairs.push(
+        `${shippingExp.shipping.experimentId}_${shippingExp.shipping.testId}`
       )
     }
 
