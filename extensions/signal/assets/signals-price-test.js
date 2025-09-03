@@ -939,7 +939,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           ...possibleSelectors.productCardContainer
         ].join(',')
       )
-      hideIndividualPriceElements(productContainer)
+      if (productContainer) {
+        hideIndividualPriceElements(productContainer)
+      }
       const variantInput = event.target.closest(
         'input[name="id"], select[name="id"], [name="id"] [value], .single-option-selector, input[type="radio"][name*="Denominations"]:checked, input[data-variant-id]:checked,.js-product-option'
       )
