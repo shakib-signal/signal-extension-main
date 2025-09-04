@@ -1233,55 +1233,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Function to update a single product card with specific product data
-  function updateSingleProductCard(container, product) {
-    const {
-      productHandle,
-      variantId,
-      price,
-      compareAtPrice,
-      discountAmount,
-      discountPercentage
-    } = product
+  // function updateSingleProductCard(container, product) {
+  //   const {
+  //     productHandle,
+  //     variantId,
+  //     price,
+  //     compareAtPrice,
+  //     discountAmount,
+  //     discountPercentage
+  //   } = product
 
-    consoleLog(
-      `Updating single product card for ${productHandle} with price ${price}`
-    )
+  //   consoleLog(
+  //     `Updating single product card for ${productHandle} with price ${price}`
+  //   )
 
-    // Find the anchor link for this product
-    const anchor = container.querySelector(
-      `a[href*="/products/${productHandle}"]`
-    )
-    if (!anchor) {
-      consoleLog(`No anchor found for ${productHandle} in container`)
-      return
-    }
+  //   // Find the anchor link for this product
+  //   const anchor = container.querySelector(
+  //     `a[href*="/products/${productHandle}"]`
+  //   )
+  //   if (!anchor) {
+  //     consoleLog(`No anchor found for ${productHandle} in container`)
+  //     return
+  //   }
 
-    // Update the anchor URL with the variant ID
-    if (anchor.tagName === 'A') {
-      try {
-        const currentHref = new URL(anchor.href, window.location.origin)
-        currentHref.searchParams.set('variant', variantId)
-        anchor.href = currentHref.toString()
-      } catch (error) {
-        consoleLog(`Error updating anchor href for ${productHandle}:`, error)
-      }
-    }
+  //   // Update the anchor URL with the variant ID
+  //   if (anchor.tagName === 'A') {
+  //     try {
+  //       const currentHref = new URL(anchor.href, window.location.origin)
+  //       currentHref.searchParams.set('variant', variantId)
+  //       anchor.href = currentHref.toString()
+  //     } catch (error) {
+  //       consoleLog(`Error updating anchor href for ${productHandle}:`, error)
+  //     }
+  //   }
 
-    // Find and update price elements
-    const priceElements = findPriceElements(container)
+  //   // Find and update price elements
+  //   const priceElements = findPriceElements(container)
 
-    // Update main product price
-    updatePriceElements(
-      priceElements,
-      price,
-      compareAtPrice,
-      discountAmount,
-      discountPercentage
-    )
+  //   // Update main product price
+  //   updatePriceElements(
+  //     priceElements,
+  //     price,
+  //     compareAtPrice,
+  //     discountAmount,
+  //     discountPercentage
+  //   )
 
-    // Update variant prices if container exists
-    updateVariantPricesOnCard(container, productHandle)
-  }
+  //   // Update variant prices if container exists
+  //   updateVariantPricesOnCard(container, productHandle)
+  // }
 
   const sortCatalogProducts = () => {
     const groupedByHandle = {}
@@ -1353,127 +1353,73 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     })
   }
-  function updateProductPricesOnCardX() {
-    if (!products || !products.length) {
-      console.warn('No products available.')
-      revealAllHiddenClasses()
-      return
+  function processAnchor(anchor, product, container) {
+    const {
+      productHandle,
+      variantId,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
+    } = product
+
+    const href = anchor.href || anchor.getAttribute('href')
+    const url = new URL(href, window.location.origin)
+
+    // Verify correct product match
+    const pathSegments = url.pathname.split('/')
+    const productsIndex = pathSegments.indexOf('products')
+    const isValidProduct =
+      productsIndex !== -1 &&
+      productsIndex + 1 < pathSegments.length &&
+      pathSegments[productsIndex + 1] === productHandle
+    if (!isValidProduct) return
+
+    // Update anchor with variantId
+    if (anchor.tagName === 'A') {
+      const currentHref = new URL(anchor.href, window.location.origin)
+      currentHref.searchParams.set('variant', variantId)
+      anchor.href = currentHref.toString()
     }
-    const productContainers = document.querySelectorAll(
-      possibleSelectors.productCardContainer.join(',')
+
+    // Update price elements
+    const priceElements = findPriceElements(container)
+    updatePriceElements(
+      priceElements,
+      price,
+      compareAtPrice,
+      discountAmount,
+      discountPercentage
     )
 
-    const sortedProducts = sortCatalogProducts()
-    sortedProducts.forEach((product) => {
-      const {
-        productHandle,
-        variantId,
-        testId,
-        price,
-        compareAtPrice,
-        discountAmount,
-        discountPercentage
-      } = product
-      productContainers
-        .querySelectorAll(`a[href*='/products/${productHandle}']`)
-        .forEach((anchor) => {
-          // const productContainer = anchor.closest(
-          //   // '.grid__item, .card-wrapper, .product-card-wrapper'
-          //   '.card-wrapper'
-          // )
-          let productContainer = null
-          for (const selector of possibleSelectors.productCardContainer) {
-            if (
-              !selector ||
-              typeof selector !== 'string' ||
-              selector.trim() === ''
-            ) {
-              continue // skip null, undefined, or empty strings
-            }
-            let container =
-              anchor.closest(selector) ||
-              anchor.parentElement?.closest(selector)
-
-            if (container) {
-              productContainer = container
-              break
-            }
-          }
-
-          if (!productContainer) return
-
-          // Store the variant ID in the product link
-          if (anchor.tagName === 'A') {
-            const currentHref = new URL(anchor.href)
-            currentHref.searchParams.set('variant', variantId)
-            anchor.href = currentHref.toString()
-          }
-
-          // Find and update price elements
-          const priceElements = findPriceElements(productContainer)
-
-          // Update main product price
-          updatePriceElements(
-            priceElements,
-            price,
-            compareAtPrice,
-            discountAmount,
-            discountPercentage
-          )
-          updateVariantPricesOnCard(productContainer, productHandle)
-        })
-    })
+    // Sync variant prices on card
+    updateVariantPricesOnCard(container, productHandle)
   }
   function updateProductPricesOnCard() {
+    // Guard clause: no products
     if (!products || !products.length) {
       console.warn('No products available.')
       revealAllHiddenClasses()
       return
     }
 
-    // All product containers on page
     const productContainers = document.querySelectorAll(
       possibleSelectors.productCardContainer.join(',')
     )
-
     const sortedProducts = sortCatalogProducts()
 
     sortedProducts.forEach((product) => {
-      const {
-        productHandle,
-        variantId,
-        price,
-        compareAtPrice,
-        discountAmount,
-        discountPercentage
-      } = product
+      const { productHandle } = product
 
-      // Find matching containers for this product by anchor href
       productContainers.forEach((container) => {
-        const anchor = container.querySelector(
+        const anchors = container.querySelectorAll(
           `a[href*="/products/${productHandle}"]`
         )
-        if (!anchor) return
+        if (!anchors.length) return
 
-        // Ensure anchor URL includes variant
-        if (anchor.tagName === 'A') {
-          const currentHref = new URL(anchor.href, window.location.origin)
-          currentHref.searchParams.set('variant', variantId)
-          anchor.href = currentHref.toString()
-        }
-
-        // Update main product price
-        const priceElements = findPriceElements(container)
-        updatePriceElements(
-          priceElements,
-          price,
-          compareAtPrice,
-          discountAmount,
-          discountPercentage
-        )
-
-        // Update variant option prices (radio buttons inside the card)
-        updateVariantPricesOnCard(container, productHandle)
+        anchors.forEach((anchor) => {
+          processAnchor(anchor, product, container)
+        })
       })
     })
   }
