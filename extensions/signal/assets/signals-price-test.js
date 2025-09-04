@@ -1714,40 +1714,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         productDescriptionSelector.querySelector('summary')
       if (descriptionSummarySelector) {
         const copySummaryDiv = descriptionSummarySelector.cloneNode(true)
-        // Clear the details container completely
         productDescriptionSelector.innerHTML = ''
 
         const truncatedDescription = truncateToThreeLines(productDescription)
-        // Find the existing paragraph and read more button
         const existingParagraph = copySummaryDiv.querySelector('p')
         const readMoreButton = copySummaryDiv.querySelector('.js-pdp-read-more')
 
         if (existingParagraph && readMoreButton) {
-          // Replace only the text content before the read more button
           const readMoreButtonHTML = readMoreButton.outerHTML
           existingParagraph.innerHTML =
             truncatedDescription + readMoreButtonHTML
         } else {
-          // Fallback: replace entire content
           copySummaryDiv.innerHTML = truncatedDescription
         }
-
-        // Store the read more selector for further processing
         const readMoreSelector =
           copySummaryDiv.querySelector('.js-pdp-read-more')
 
-        // Append the cloned summary and description div to details container
         productDescriptionSelector.appendChild(copySummaryDiv)
       }
-      // Create a div for full product description
       const fullDescriptionDiv = document.createElement('div')
       fullDescriptionDiv.className = 'product-description-full'
       fullDescriptionDiv.innerHTML = productDescription
       productDescriptionSelector.appendChild(fullDescriptionDiv)
-
-      // if (productDescriptionSelector) {
-      //   productDescriptionSelector.innerHTML = productDescription
-      // }
     }
   }
 
