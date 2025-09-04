@@ -3495,6 +3495,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         `${imageTestExp.experimentId}_${imageTestExp.testId}`
       )
     }
+    // description Test
+    const descriptionTestExp = products
+      .filter((p) => p.experimentType === 'description_testing')
+      .find((p) => p.variantId === variantId)
+
+    if (descriptionTestExp) {
+      experimentPairs.push(
+        `${descriptionTestExp.experimentId}_${descriptionTestExp.testId}`
+      )
+    }
 
     const shippingExp = experiments?.experiments?.find(
       (e) => e.experimentType == 'shipping_testing'
@@ -3540,11 +3550,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addButton = form.querySelector('[name="add"]')
     addButton?.classList.add('is-loading', 'app-loading-white')
     const properties = {
-      __si_p: price,
-      __si_d: discountAmount,
       // __si_sub: sellingObj?.isToggleOn ? priceTestExp?.sellingDiscount : '',
       __si_ud: userId,
       __si_exp: experimentString
+    }
+    if (priceTestExp) {
+      properties['__si_p'] = price
+      properties['__si_d'] = discountAmount
     }
 
     fetch('/cart/add.js', {

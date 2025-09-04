@@ -1,0 +1,7 @@
+
+::view-transition {}
+::view-transition-old(root) {}
+::view-transition-group(vt-6) {}
+::view-transition-image-pair(vt-6) {}
+::view-transition-old(vt-6) {}
+::view-transition-new(root) {}
