@@ -1233,55 +1233,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Function to update a single product card with specific product data
-  function updateSingleProductCard(container, product) {
-    const {
-      productHandle,
-      variantId,
-      price,
-      compareAtPrice,
-      discountAmount,
-      discountPercentage
-    } = product
+  // function updateSingleProductCard(container, product) {
+  //   const {
+  //     productHandle,
+  //     variantId,
+  //     price,
+  //     compareAtPrice,
+  //     discountAmount,
+  //     discountPercentage
+  //   } = product
 
-    consoleLog(
-      `Updating single product card for ${productHandle} with price ${price}`
-    )
+  //   consoleLog(
+  //     `Updating single product card for ${productHandle} with price ${price}`
+  //   )
 
-    // Find the anchor link for this product
-    const anchor = container.querySelector(
-      `a[href*="/products/${productHandle}"]`
-    )
-    if (!anchor) {
-      consoleLog(`No anchor found for ${productHandle} in container`)
-      return
-    }
+  //   // Find the anchor link for this product
+  //   const anchor = container.querySelector(
+  //     `a[href*="/products/${productHandle}"]`
+  //   )
+  //   if (!anchor) {
+  //     consoleLog(`No anchor found for ${productHandle} in container`)
+  //     return
+  //   }
 
-    // Update the anchor URL with the variant ID
-    if (anchor.tagName === 'A') {
-      try {
-        const currentHref = new URL(anchor.href, window.location.origin)
-        currentHref.searchParams.set('variant', variantId)
-        anchor.href = currentHref.toString()
-      } catch (error) {
-        consoleLog(`Error updating anchor href for ${productHandle}:`, error)
-      }
-    }
+  //   // Update the anchor URL with the variant ID
+  //   if (anchor.tagName === 'A') {
+  //     try {
+  //       const currentHref = new URL(anchor.href, window.location.origin)
+  //       currentHref.searchParams.set('variant', variantId)
+  //       anchor.href = currentHref.toString()
+  //     } catch (error) {
+  //       consoleLog(`Error updating anchor href for ${productHandle}:`, error)
+  //     }
+  //   }
 
-    // Find and update price elements
-    const priceElements = findPriceElements(container)
+  //   // Find and update price elements
+  //   const priceElements = findPriceElements(container)
 
-    // Update main product price
-    updatePriceElements(
-      priceElements,
-      price,
-      compareAtPrice,
-      discountAmount,
-      discountPercentage
-    )
+  //   // Update main product price
+  //   updatePriceElements(
+  //     priceElements,
+  //     price,
+  //     compareAtPrice,
+  //     discountAmount,
+  //     discountPercentage
+  //   )
 
-    // Update variant prices if container exists
-    updateVariantPricesOnCard(container, productHandle)
-  }
+  //   // Update variant prices if container exists
+  //   updateVariantPricesOnCard(container, productHandle)
+  // }
 
   const sortCatalogProducts = () => {
     const groupedByHandle = {}
@@ -1353,7 +1353,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     })
   }
-
   function processAnchor(anchor, product, container) {
     const {
       productHandle,
@@ -1654,14 +1653,101 @@ document.addEventListener('DOMContentLoaded', async () => {
       'variant'
     )
     const detectedVariantId = variantIdFromUrl ?? firstVariant_product
+    const truncateToThreeLines = (htmlText, maxLength = 338) => {
+      // Create a temporary div to parse HTML
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = htmlText
+
+      // Get plain text content
+      const plainText = tempDiv.textContent || tempDiv.innerText || ''
+
+      if (plainText.length <= maxLength) return htmlText
+
+      // Find the last complete sentence within the limit
+      const truncated = plainText.substring(0, maxLength)
+      const lastSentenceEnd = Math.max(
+        truncated.lastIndexOf('.'),
+        truncated.lastIndexOf('!'),
+        truncated.lastIndexOf('?')
+      )
+
+      let cutPoint = maxLength
+      if (lastSentenceEnd > maxLength * 0.6) {
+        cutPoint = lastSentenceEnd + 1
+      } else {
+        // If no good sentence break, cut at word boundary
+        const lastSpace = truncated.lastIndexOf(' ')
+        cutPoint = lastSpace > maxLength * 0.7 ? lastSpace : maxLength
+      }
+
+      // Now we need to find the corresponding position in the HTML
+      let htmlPosition = 0
+      let textPosition = 0
+      let inTag = false
+
+      for (let i = 0; i < htmlText.length && textPosition < cutPoint; i++) {
+        if (htmlText[i] === '<') {
+          inTag = true
+        } else if (htmlText[i] === '>') {
+          inTag = false
+        } else if (!inTag) {
+          textPosition++
+        }
+        htmlPosition = i + 1
+      }
+
+      // Extract the truncated HTML and add ellipsis if needed
+      let truncatedHtml = htmlText.substring(0, htmlPosition)
+      if (cutPoint < plainText.length) {
+        truncatedHtml
+        // truncatedHtml += '...'
+      }
+
+      return truncatedHtml
+    }
 
     if (variantId == detectedVariantId) {
       const productDescriptionSelector = document.querySelector(
         selectors?.textClassOrId
       )
-      if (productDescriptionSelector) {
-        productDescriptionSelector.innerHTML = productDescription
+      const descriptionSummarySelector =
+        productDescriptionSelector.querySelector('summary')
+      if (descriptionSummarySelector) {
+        const copySummaryDiv = descriptionSummarySelector.cloneNode(true)
+        // Clear the details container completely
+        productDescriptionSelector.innerHTML = ''
+
+        const truncatedDescription = truncateToThreeLines(productDescription)
+        // Find the existing paragraph and read more button
+        const existingParagraph = copySummaryDiv.querySelector('p')
+        const readMoreButton = copySummaryDiv.querySelector('.js-pdp-read-more')
+
+        if (existingParagraph && readMoreButton) {
+          // Replace only the text content before the read more button
+          const readMoreButtonHTML = readMoreButton.outerHTML
+          existingParagraph.innerHTML =
+            truncatedDescription + readMoreButtonHTML
+        } else {
+          // Fallback: replace entire content
+          copySummaryDiv.innerHTML = truncatedDescription
+        }
+
+        // Store the read more selector for further processing
+        const readMoreSelector =
+          copySummaryDiv.querySelector('.js-pdp-read-more')
+
+        // Append the cloned summary and description div to details container
+        productDescriptionSelector.appendChild(copySummaryDiv)
       }
+      // Create a div for full product description
+      const fullDescriptionDiv = document.createElement('div')
+      fullDescriptionDiv.className = 'product-description-full'
+      fullDescriptionDiv.innerHTML = productDescription
+      productDescriptionSelector.appendChild(fullDescriptionDiv)
+
+      // if (productDescriptionSelector) {
+      //   productDescriptionSelector.innerHTML = productDescription
+      // }
     }
   }
 

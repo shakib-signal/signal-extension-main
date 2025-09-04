@@ -1653,14 +1653,101 @@ document.addEventListener('DOMContentLoaded', async () => {
       'variant'
     )
     const detectedVariantId = variantIdFromUrl ?? firstVariant_product
+    const truncateToThreeLines = (htmlText, maxLength = 338) => {
+      // Create a temporary div to parse HTML
+      const tempDiv = document.createElement('div')
+      tempDiv.innerHTML = htmlText
+
+      // Get plain text content
+      const plainText = tempDiv.textContent || tempDiv.innerText || ''
+
+      if (plainText.length <= maxLength) return htmlText
+
+      // Find the last complete sentence within the limit
+      const truncated = plainText.substring(0, maxLength)
+      const lastSentenceEnd = Math.max(
+        truncated.lastIndexOf('.'),
+        truncated.lastIndexOf('!'),
+        truncated.lastIndexOf('?')
+      )
+
+      let cutPoint = maxLength
+      if (lastSentenceEnd > maxLength * 0.6) {
+        cutPoint = lastSentenceEnd + 1
+      } else {
+        // If no good sentence break, cut at word boundary
+        const lastSpace = truncated.lastIndexOf(' ')
+        cutPoint = lastSpace > maxLength * 0.7 ? lastSpace : maxLength
+      }
+
+      // Now we need to find the corresponding position in the HTML
+      let htmlPosition = 0
+      let textPosition = 0
+      let inTag = false
+
+      for (let i = 0; i < htmlText.length && textPosition < cutPoint; i++) {
+        if (htmlText[i] === '<') {
+          inTag = true
+        } else if (htmlText[i] === '>') {
+          inTag = false
+        } else if (!inTag) {
+          textPosition++
+        }
+        htmlPosition = i + 1
+      }
+
+      // Extract the truncated HTML and add ellipsis if needed
+      let truncatedHtml = htmlText.substring(0, htmlPosition)
+      if (cutPoint < plainText.length) {
+        truncatedHtml
+        // truncatedHtml += '...'
+      }
+
+      return truncatedHtml
+    }
 
     if (variantId == detectedVariantId) {
       const productDescriptionSelector = document.querySelector(
         selectors?.textClassOrId
       )
-      if (productDescriptionSelector) {
-        productDescriptionSelector.innerHTML = productDescription
+      const descriptionSummarySelector =
+        productDescriptionSelector.querySelector('summary')
+      if (descriptionSummarySelector) {
+        const copySummaryDiv = descriptionSummarySelector.cloneNode(true)
+        // Clear the details container completely
+        productDescriptionSelector.innerHTML = ''
+
+        const truncatedDescription = truncateToThreeLines(productDescription)
+        // Find the existing paragraph and read more button
+        const existingParagraph = copySummaryDiv.querySelector('p')
+        const readMoreButton = copySummaryDiv.querySelector('.js-pdp-read-more')
+
+        if (existingParagraph && readMoreButton) {
+          // Replace only the text content before the read more button
+          const readMoreButtonHTML = readMoreButton.outerHTML
+          existingParagraph.innerHTML =
+            truncatedDescription + readMoreButtonHTML
+        } else {
+          // Fallback: replace entire content
+          copySummaryDiv.innerHTML = truncatedDescription
+        }
+
+        // Store the read more selector for further processing
+        const readMoreSelector =
+          copySummaryDiv.querySelector('.js-pdp-read-more')
+
+        // Append the cloned summary and description div to details container
+        productDescriptionSelector.appendChild(copySummaryDiv)
       }
+      // Create a div for full product description
+      const fullDescriptionDiv = document.createElement('div')
+      fullDescriptionDiv.className = 'product-description-full'
+      fullDescriptionDiv.innerHTML = productDescription
+      productDescriptionSelector.appendChild(fullDescriptionDiv)
+
+      // if (productDescriptionSelector) {
+      //   productDescriptionSelector.innerHTML = productDescription
+      // }
     }
   }
 
