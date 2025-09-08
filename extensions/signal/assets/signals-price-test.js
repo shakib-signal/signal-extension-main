@@ -1706,36 +1706,46 @@ document.addEventListener('DOMContentLoaded', async () => {
       return truncatedHtml
     }
 
-    if (variantId == detectedVariantId) {
-      const productDescriptionSelector = document.querySelector(
+    if (variantId === detectedVariantId) {
+      const descriptionContainer = document.querySelector(
         selectors?.textClassOrId
       )
-      const descriptionSummarySelector =
-        productDescriptionSelector.querySelector('summary')
-      if (descriptionSummarySelector) {
-        const copySummaryDiv = descriptionSummarySelector.cloneNode(true)
-        productDescriptionSelector.innerHTML = ''
+      if (!descriptionContainer) return
 
+      const descriptionSummarySelector =
+        descriptionContainer.querySelector('summary')
+
+      // Clone summary before clearing container
+      const copySummaryDiv = descriptionSummarySelector
+        ? descriptionSummarySelector.cloneNode(true)
+        : null
+
+      // Clear container content
+      descriptionContainer.innerHTML = ''
+
+      if (copySummaryDiv) {
         const truncatedDescription = truncateToThreeLines(productDescription)
+
         const existingParagraph = copySummaryDiv.querySelector('p')
         const readMoreButton = copySummaryDiv.querySelector('.js-pdp-read-more')
 
         if (existingParagraph && readMoreButton) {
-          const readMoreButtonHTML = readMoreButton.outerHTML
+          // Preserve "Read More" button
           existingParagraph.innerHTML =
-            truncatedDescription + readMoreButtonHTML
+            truncatedDescription + readMoreButton.outerHTML
         } else {
+          // Just insert truncated description
           copySummaryDiv.innerHTML = truncatedDescription
         }
-        const readMoreSelector =
-          copySummaryDiv.querySelector('.js-pdp-read-more')
 
-        productDescriptionSelector.appendChild(copySummaryDiv)
+        descriptionContainer.appendChild(copySummaryDiv)
       }
+
+      // Always append full description
       const fullDescriptionDiv = document.createElement('div')
       fullDescriptionDiv.className = 'product-description-full'
       fullDescriptionDiv.innerHTML = productDescription
-      productDescriptionSelector.appendChild(fullDescriptionDiv)
+      descriptionContainer.appendChild(fullDescriptionDiv)
     }
   }
 

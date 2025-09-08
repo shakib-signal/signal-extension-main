@@ -1706,48 +1706,46 @@ document.addEventListener('DOMContentLoaded', async () => {
       return truncatedHtml
     }
 
-    if (variantId == detectedVariantId) {
-      const productDescriptionSelector = document.querySelector(
+    if (variantId === detectedVariantId) {
+      const descriptionContainer = document.querySelector(
         selectors?.textClassOrId
       )
-      const descriptionSummarySelector =
-        productDescriptionSelector.querySelector('summary')
-      if (descriptionSummarySelector) {
-        const copySummaryDiv = descriptionSummarySelector.cloneNode(true)
-        // Clear the details container completely
-        productDescriptionSelector.innerHTML = ''
+      if (!descriptionContainer) return
 
+      const descriptionSummarySelector =
+        descriptionContainer.querySelector('summary')
+
+      // Clone summary before clearing container
+      const copySummaryDiv = descriptionSummarySelector
+        ? descriptionSummarySelector.cloneNode(true)
+        : null
+
+      // Clear container content
+      descriptionContainer.innerHTML = ''
+
+      if (copySummaryDiv) {
         const truncatedDescription = truncateToThreeLines(productDescription)
-        // Find the existing paragraph and read more button
+
         const existingParagraph = copySummaryDiv.querySelector('p')
         const readMoreButton = copySummaryDiv.querySelector('.js-pdp-read-more')
 
         if (existingParagraph && readMoreButton) {
-          // Replace only the text content before the read more button
-          const readMoreButtonHTML = readMoreButton.outerHTML
+          // Preserve "Read More" button
           existingParagraph.innerHTML =
-            truncatedDescription + readMoreButtonHTML
+            truncatedDescription + readMoreButton.outerHTML
         } else {
-          // Fallback: replace entire content
+          // Just insert truncated description
           copySummaryDiv.innerHTML = truncatedDescription
         }
 
-        // Store the read more selector for further processing
-        const readMoreSelector =
-          copySummaryDiv.querySelector('.js-pdp-read-more')
-
-        // Append the cloned summary and description div to details container
-        productDescriptionSelector.appendChild(copySummaryDiv)
+        descriptionContainer.appendChild(copySummaryDiv)
       }
-      // Create a div for full product description
+
+      // Always append full description
       const fullDescriptionDiv = document.createElement('div')
       fullDescriptionDiv.className = 'product-description-full'
       fullDescriptionDiv.innerHTML = productDescription
-      productDescriptionSelector.appendChild(fullDescriptionDiv)
-
-      // if (productDescriptionSelector) {
-      //   productDescriptionSelector.innerHTML = productDescription
-      // }
+      descriptionContainer.appendChild(fullDescriptionDiv)
     }
   }
 
