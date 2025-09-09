@@ -983,6 +983,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     return priceEl
   }
+  const updateBadgeText = (text, newValue) => {
+    const cleanedText = text
+      .replace(new RegExp(`\\${currencySymbol}`, 'g'), '')
+      .trim()
+    const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
+    const match = cleanedText.match(pattern)
+
+    if (match) {
+      const [, beforeText, , afterText] = match
+      return beforeText + newValue + afterText
+    }
+
+    return newValue
+  }
 
   // function updateSaleClass(container, isOnSale) {
   //   if (!container || !Array.from(container.classList).length) return
@@ -1055,21 +1069,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           : ''
       }`
     )
-
-    const updateBadgeText = (text, newValue) => {
-      const cleanedText = text
-        .replace(new RegExp(`\\${currencySymbol}`, 'g'), '')
-        .trim()
-      const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
-      const match = cleanedText.match(pattern)
-
-      if (match) {
-        const [, beforeText, , afterText] = match
-        return beforeText + newValue + afterText
-      }
-
-      return newValue
-    }
 
     // Update all sale prices
     priceElements.sale.forEach((priceEl) => {

@@ -2163,8 +2163,41 @@ document.addEventListener('DOMContentLoaded', () => {
   // =============================
   // ✅ Default Theme Picker
   // =============================
-  const defaultMouseOver = (e) => {
-    const aTag = e.target.closest('a')
+
+  function startInspector(mouseOver, clickHandler) {
+    // create overlay
+    inspectorOverlay = document.createElement('div')
+    inspectorOverlay.style.position = 'fixed'
+    inspectorOverlay.style.top = 0
+    inspectorOverlay.style.left = 0
+    inspectorOverlay.style.width = '100%'
+    inspectorOverlay.style.height = '100%'
+    inspectorOverlay.style.zIndex = 999
+    inspectorOverlay.style.cursor = 'crosshair'
+    inspectorOverlay.style.background = 'transparent'
+    document.body.appendChild(inspectorOverlay)
+
+    inspectorOverlay.addEventListener('mousemove', mouseOver)
+    inspectorOverlay.addEventListener('click', clickHandler)
+  }
+  function stopInspector() {
+    if (inspectorOverlay) {
+      inspectorOverlay.remove()
+      inspectorOverlay = null
+    }
+  }
+  function getRealElementAt(x, y) {
+    // temporarily hide overlay
+    inspectorOverlay.style.display = 'none'
+    const el = document.elementFromPoint(x, y)
+    inspectorOverlay.style.display = 'block'
+    return el
+  }
+
+  const defaultMouseOverX = (e) => {
+    const el = getRealElementAt(e.clientX, e.clientY)
+
+    const aTag = el.target.closest('a')
     if (aTag && !aTag.__replaced) {
       aTag.__originalDisplay = aTag.style.display
       aTag.style.display = 'none'
@@ -2182,16 +2215,17 @@ document.addEventListener('DOMContentLoaded', () => {
       })
     }
 
-    if (priceSelectors.some((sel) => e.target.closest(sel))) {
-      e.target.classList.add('__price-hover-target')
+    if (priceSelectors.some((sel) => el.target.closest(sel))) {
+      el.target.classList.add('__price-hover-target')
     }
   }
 
-  const defaultMouseOut = (e) => {
-    e.target.classList.remove('__price-hover-target')
+  const defaultMouseOutX = (e) => {
+    const el = getRealElementAt(e.clientX, e.clientY)
+    el.target.classList.remove('__price-hover-target')
   }
 
-  const defaultClickHandler = (e) => {
+  const defaultClickHandlerX = (e) => {
     if (
       e.target.closest('.regular-price-trigger') ||
       e.target.closest('.compare-at-price-trigger') ||
@@ -2201,7 +2235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     e.stopPropagation()
 
-    const match = findPriceElement(e.target)
+    const match = findPriceElement(getRealElementAt(e.clientX, e.clientY))
     if (!match) return
 
     const { el: target, type } = match
@@ -2209,16 +2243,69 @@ document.addEventListener('DOMContentLoaded', () => {
     target.classList.add('__price-selected')
     showPriceInfoModal(target, type)
   }
+  const defaultMouseOver = (e) => {
+    const el = getRealElementAt(e.clientX, e.clientY)
+    if (!el) return
+
+    // replace <a> for display (your existing logic)
+    const aTag = el.closest('a')
+    if (aTag && !aTag.__replaced) {
+      aTag.__originalDisplay = aTag.style.display
+      aTag.style.display = 'none'
+
+      const h5 = document.createElement('h5')
+      h5.textContent = aTag.innerText || aTag.textContent || ''
+      h5.style.color = '#121212'
+      aTag.parentNode.insertBefore(h5, aTag.nextSibling)
+      aTag.__replaced = true
+
+      h5.addEventListener('mouseout', () => {
+        h5.remove()
+        aTag.style.display = aTag.__originalDisplay || ''
+        aTag.__replaced = false
+      })
+    }
+
+    // highlight price element
+    if (priceSelectors.some((sel) => el.closest(sel))) {
+      document
+        .querySelectorAll('.__price-hover-target')
+        .forEach((node) => node.classList.remove('__price-hover-target'))
+      el.classList.add('__price-hover-target')
+    }
+  }
+
+  const defaultClickHandler = (e) => {
+    if (
+      e.target.closest('.regular-price-trigger') ||
+      e.target.closest('.compare-at-price-trigger') ||
+      e.target.closest('.badge-trigger')
+    )
+      return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const el = getRealElementAt(e.clientX, e.clientY)
+    if (!el) return
+
+    const match = findPriceElement(el)
+    if (!match) return
+
+    stopPricePicker()
+    match.el.classList.add('__price-selected')
+    showPriceInfoModal(match.el, match.type)
+  }
 
   function startDefaultPricePicker() {
     if (pickingPrice) return
     pickingPrice = true
-
+    startInspector(defaultMouseOver, defaultClickHandler)
     appendHoverStyle()
 
-    document.addEventListener('mouseover', defaultMouseOver)
-    document.addEventListener('mouseout', defaultMouseOut)
-    document.addEventListener('click', defaultClickHandler, true)
+    // document.addEventListener('mouseover', defaultMouseOver)
+    // document.addEventListener('mouseout', defaultMouseOut)
+    // document.addEventListener('click', defaultClickHandler, true)
   }
 
   // =============================
@@ -2239,17 +2326,53 @@ document.addEventListener('DOMContentLoaded', () => {
     'product-page .price__badge',
     '.price'
   ]
-
   horizonMouseOver = (e) => {
+    const el = getRealElementAt(e.clientX, e.clientY)
+    if (!el) return
+
+    const target = el.closest(horizonSelectors.join(','))
+    document
+      .querySelectorAll('.__price-hover-target')
+      .forEach((node) => node.classList.remove('__price-hover-target'))
+
+    if (target) target.classList.add('__price-hover-target')
+  }
+  horizonMouseOverX = (e) => {
     const el = e.target.closest(horizonSelectors.join(','))
     if (el) el.classList.add('__price-hover-target')
   }
 
-  horizonMouseOut = (e) => {
-    e.target.classList.remove('__price-hover-target')
-  }
+  // horizonMouseOut = (e) => {
+  //   e.target.classList.remove('__price-hover-target')
+  // }
 
   horizonClickHandler = (e) => {
+    if (
+      e.target.closest('.regular-price-trigger') ||
+      e.target.closest('.compare-at-price-trigger') ||
+      e.target.closest('.badge-trigger')
+    )
+      return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const el = getRealElementAt(e.clientX, e.clientY)
+    if (!el) return
+
+    const target = el.closest(horizonSelectors.join(','))
+    if (!target) return
+
+    stopPricePicker()
+    target.classList.add('__price-selected')
+
+    let type = target.classList.contains('compare-at-price')
+      ? 'Compare at Price'
+      : 'Sale or Regular Price'
+
+    showPriceInfoModal(target, type)
+  }
+
+  horizonClickHandlerX = (e) => {
     // 🛡️ Prevent the handler from reacting to trigger button clicks
     if (
       e.target.closest('.regular-price-trigger') ||
@@ -2277,11 +2400,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pickingPrice) return
     pickingPrice = true
 
+    startInspector(horizonMouseOver, horizonClickHandler)
     appendHoverStyle()
 
-    document.addEventListener('mouseover', horizonMouseOver)
-    document.addEventListener('mouseout', horizonMouseOut)
-    document.addEventListener('click', horizonClickHandler, true)
+    // document.addEventListener('mouseover', horizonMouseOver)
+    // document.addEventListener('mouseout', horizonMouseOut)
+    // document.addEventListener('click', horizonClickHandler, true)
     console.log('Horizon Picker started')
   }
 
@@ -2306,7 +2430,6 @@ document.addEventListener('DOMContentLoaded', () => {
   function startPricePicker() {
     // console.log('isHorizon', isHorizonTheme())
     if (isHorizonTheme()) {
-      console.log('inHorizon')
       startHorizonPricePicker()
     } else {
       console.log('indefault')
@@ -2320,20 +2443,22 @@ document.addEventListener('DOMContentLoaded', () => {
     pickingPrice = false
     // console.log('stopPicker', pickingPrice)
 
+    stopInspector()
+
     document.getElementById('__price-picker-style')?.remove()
     document
       .querySelectorAll('.__price-hover-target')
       .forEach((el) => el.classList.remove('__price-hover-target'))
-    document
-      .querySelectorAll('.__price-selected')
-      .forEach((el) => el.classList.remove('__price-selected'))
+    // document
+    //   .querySelectorAll('.__price-selected')
+    //   .forEach((el) => el.classList.remove('__price-selected'))
 
     document.removeEventListener('mouseover', defaultMouseOver)
-    document.removeEventListener('mouseout', defaultMouseOut)
+    // document.removeEventListener('mouseout', defaultMouseOut)
     document.removeEventListener('click', defaultClickHandler, true)
 
     document.removeEventListener('mouseover', horizonMouseOver)
-    document.removeEventListener('mouseout', horizonMouseOut)
+    // document.removeEventListener('mouseout', horizonMouseOut)
     document.removeEventListener('click', horizonClickHandler, true)
     console.log('Picker stopped')
   }
@@ -3511,12 +3636,18 @@ function getProductInfoFromElement(el, inputId) {
 
 // for badge text
 const updateBadgeText = (text, newValue) => {
-  const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
+  // Remove any currency symbols from the old text
+  text = text.replace(/[$€£¥₹]/g, '')
+
+  // Pattern: anything before + number/percent + anything after
+  const pattern = /^(.*?)([0-9.,]+%?)(.*)$/i
   const match = text.match(pattern)
+
   if (match) {
     const [, beforeText, , afterText] = match
     return beforeText + newValue + afterText
   }
+
   return newValue
 }
 
@@ -3615,7 +3746,7 @@ function updatePricesForPage(selector, isRegular, isbadge) {
       )
 
       safelyUpdatePrice(el, formattedPrice, false)
-    } else {
+    } else if (matchedProduct?.discountAmount > 0) {
       // const preBadgeValue = isPlainLabel(badgeOrginalText)
       // console.log('preBadge', preBadgeValue)
       // const badgeValue = !preBadgeValue ? matchedProduct.discountAmount : badgeOrginalText;
