@@ -2228,6 +2228,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const horizonSelectors = [
     'product-price .price',
+    '.js-add-to-cart-price',
+    '.js-add-to-cart-compare-price',
     'product-price .compare-at-price',
     '.price-regular-value',
     '.price-compare',
@@ -2396,6 +2398,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // console.log('pickeingPrice', pickingPrice)
       buttonEl.style.color = '#fff'
       const button = document.querySelectorAll('.picker-bg')
+
       if (button) {
         button.forEach((btn) => {
           btn.style.background = '#1D4ED8'
