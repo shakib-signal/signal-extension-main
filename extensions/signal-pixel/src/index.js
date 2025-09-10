@@ -78,6 +78,7 @@ register(({ analytics, browser, init }) => {
       const activeExperimentJSON = await browser.localStorage.getItem(
         'signal_active_experiments'
       )
+      console.log(activeExperimentJSON, 'activeExperimentJSON')
       if (!activeExperimentJSON) return null
 
       // If the value is stored as an object (some storage APIs auto-parse), handle that:
@@ -192,16 +193,14 @@ register(({ analytics, browser, init }) => {
   }
   // get experiment context
   async function getExperimentContext(variantId) {
-    const rawExperimentIds = await browser.localStorage.getItem(
-      'themeTestingExperiment'
-    )
-    const experimentId =
-      rawExperimentIds && rawExperimentIds !== 'undefined'
-        ? JSON.parse(rawExperimentIds)
-        : null
-
     const themeExperiment = await getThemeExperiment()
+    const experimentId =
+      themeExperiment && themeExperiment !== 'undefined'
+        ? themeExperiment?.experimentId
+        : null
+    console.log(experimentId, 'experimentId')
     const experimentTypes = await getExperimentType(experimentId)
+    console.log(experimentTypes, 'experimentTypes')
     const isInExperiment = variantId
       ? await isProductInExperiment(variantId)
       : false

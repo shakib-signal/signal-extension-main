@@ -11,36 +11,37 @@ const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
 const flicker_selectors = flicker_container_selectors
-// Get custom selectors from theme settings
-const all_selectors = selectors_data
-const selectors = all_selectors?.find(
+// Get custom elementSelectors from theme settings
+const all_selectors = selectors_data || []
+const elementSelectors = all_selectors?.find(
   (selector) => selector.themeId == current_themeId
 )?.selectors
-searchInput = splitSelectors(selectors?.searchClassOrId)
-
-const modalContent = splitSelectors(selectors?.modalClassOrId ?? [])
-const modalButton = splitSelectors(selectors?.triggerButtonClassOrId ?? [])
+searchInput = splitSelectors(elementSelectors?.searchClassOrId)
+const modalContent = splitSelectors(elementSelectors?.modalClassOrId ?? [])
+const modalButton = splitSelectors(
+  elementSelectors?.triggerButtonClassOrId ?? []
+)
 
 if (modalContent || modalButton) {
   modalTrigger = [...modalContent, ...modalButton]
 }
 productContainerTest = [
-  ...(selectors?.productContainer || []),
-  ...(selectors?.triggerElementContainer || [])
+  ...(elementSelectors?.productContainer || []),
+  ...(elementSelectors?.triggerElementContainer || [])
 ]
 ;(function storeSelectorsForPrice() {
   customSelectors = {
     productCardContainer: productContainerTest || [],
-    singleProductContainer: selectors?.singleProductContainer || [],
+    singleProductContainer: elementSelectors?.singleProductContainer || [],
     searchInputSelector: searchInput || [],
     modalTriggerSelector: modalTrigger || [],
-    priceContainer: selectors?.priceContainer || [],
-    compare: selectors?.comparePriceClassOrId || [],
-    sale: selectors?.salePriceClassOrId || [],
+    priceContainer: elementSelectors?.priceContainer || [],
+    compare: elementSelectors?.comparePriceClassOrId || [],
+    sale: elementSelectors?.salePriceClassOrId || [],
     badges: ['.badge', '.price__badge']
   }
 
-  // Merge default and custom selectors
+  // Merge default and custom elementSelectors
   possibleSelectors = {
     productCardContainer: [
       ...new Set([
@@ -114,7 +115,7 @@ const sanitizeArray = (arr) =>
     .map((s) => s.trim())
     .filter(Boolean)
 
-// Get custom selectors injected from theme settings (Liquid or App Block)
+// Get custom elementSelectors injected from theme settings (Liquid or App Block)
 const customImageSelectors = {
   productCardContainer: [],
 
@@ -129,7 +130,7 @@ const customImageSelectors = {
   predictiveSearchImage: []
 }
 
-// Define reliable default selectors for common themes
+// Define reliable default elementSelectors for common themes
 const defaultImageSelectors = {
   productCardContainer: [
     '.card--standard',
@@ -180,7 +181,7 @@ const defaultImageSelectors = {
   predictiveSearchItem: ['.predictive-search__list-item'],
   predictiveSearchImage: ['.predictive-search__image'],
 
-  // Existing additional selectors
+  // Existing additional elementSelectors
   productCardInner: ['.card__inner', 'picture'],
   productCardMediaContainer: [
     '.card__media',
@@ -195,7 +196,7 @@ const defaultImageSelectors = {
   productCardHeading: ['.card__heading', '.grid-view-item__title']
 }
 
-// Merge custom and default selectors
+// Merge custom and default elementSelectors
 const imageSelectors = {
   productCardContainer: [
     ...new Set([
@@ -299,7 +300,7 @@ function storeExperimentData(experiments, products, utmParams) {
     products,
     utmParams: utmParams,
     themeTestingExperiment: experiment?.id,
-    themeObject: experiment?.theme
+    theme: experiment?.theme
   }
   localStorage.setItem(
     'signal_active_experiments',
@@ -472,7 +473,7 @@ function revealAllHiddenClasses() {
   })
 }
 
-// fetching selectors data
+// fetching elementSelectors data
 
 // async function fetchStoreClassSelector() {
 //   const themeInfo = window.Shopify.theme
@@ -496,7 +497,7 @@ function revealAllHiddenClasses() {
 //     }
 
 //     if (result.data) {
-//       const { themeName, selectors: fetchedSelectors } = result.data
+//       const { themeName, elementSelectors: fetchedSelectors } = result.data
 //       return fetchedSelectors || {}
 //     }
 //   } catch (error) {
@@ -506,9 +507,9 @@ function revealAllHiddenClasses() {
 //   return {}
 // }
 
-// // Initialize selectors immediately
+// // Initialize elementSelectors immediately
 // ;(async function initializeSelectors() {
-//   selectors = await fetchStoreClassSelector()
+//   elementSelectors = await fetchStoreClassSelector()
 // })()
 
 // started code
@@ -807,7 +808,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       // })
 
       if (foundElements.badges.length > 0) {
-        break // stop checking other selectors
+        break // stop checking other elementSelectors
       }
     }
 
@@ -983,20 +984,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     return priceEl
   }
-  const updateBadgeText = (text, newValue) => {
-    const cleanedText = text
-      .replace(new RegExp(`\\${currencySymbol}`, 'g'), '')
-      .trim()
-    const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
-    const match = cleanedText.match(pattern)
-
-    if (match) {
-      const [, beforeText, , afterText] = match
-      return beforeText + newValue + afterText
-    }
-
-    return newValue
-  }
 
   // function updateSaleClass(container, isOnSale) {
   //   if (!container || !Array.from(container.classList).length) return
@@ -1069,6 +1056,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           : ''
       }`
     )
+
+    const updateBadgeText = (text, newValue) => {
+      const cleanedText = text
+        .replace(new RegExp(`\\${currencySymbol}`, 'g'), '')
+        .trim()
+      const pattern = /^(.*?)([a-zA-Z]*\d+\.?\d*%?)(.*)$/i
+      const match = cleanedText.match(pattern)
+
+      if (match) {
+        const [, beforeText, , afterText] = match
+        return beforeText + newValue + afterText
+      }
+
+      return newValue
+    }
 
     // Update all sale prices
     priceElements.sale.forEach((priceEl) => {
@@ -1713,7 +1715,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (variantId === detectedVariantId) {
       const descriptionContainer = document.querySelector(
-        selectors?.textClassOrId
+        elementSelectors?.textClassOrId
       )
       if (!descriptionContainer) return
 
@@ -2171,6 +2173,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       )
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
+    if (experiment?.experimentType == 'theme_testing') {
+      storeExperimentData(experiments, products)
+      const currentTest = experiment?.tests?.find(
+        (test) => test?.testId == experiment?.theme?.testId
+      )
+      console.log(currentTest, 'currentTest')
+      console.log(
+        `%cCurrently Running(Theme Testing): ${
+          currentTest?.name ? `(${currentTest?.name})` : ''
+        } of ${experiment.name}`,
+        'color: lightgreen; font-weight: bold;'
+      )
+
+      return
+    }
     if (now >= startDate && now <= endDate) {
       experimentFound = true
       if (!isUTMAllowed(experiment)) {
@@ -2476,7 +2493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const predictiveSearch = searchModal.querySelector('.predictive-search')
       if (!predictiveSearch) return
 
-      // Use more comprehensive selectors to catch all instances
+      // Use more comprehensive elementSelectors to catch all instances
       const allProductCards = predictiveSearch.querySelectorAll(
         `[data-product-id="${productId}"], [data-product-handle*="${productId}"]`
       )
@@ -2535,16 +2552,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       let didUpdate = false
 
       // --- Universal Safe Query Helpers ---
-      const safeQuery = (selectors = [], root = document) => {
-        for (const sel of selectors) {
+      const safeQuery = (elementSelectors = [], root = document) => {
+        for (const sel of elementSelectors) {
           const el = root.querySelector(sel)
           if (el) return el
         }
         return null
       }
 
-      const safeQueryAll = (selectors = [], root = document) => {
-        for (const sel of selectors) {
+      const safeQueryAll = (elementSelectors = [], root = document) => {
+        for (const sel of elementSelectors) {
           const els = root.querySelectorAll(sel)
           if (els.length) return els
         }
