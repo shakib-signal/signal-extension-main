@@ -3767,66 +3767,108 @@ document.addEventListener('DOMContentLoaded', async () => {
   // =============================
   // Interceptor: fetch + XHR
   // =============================
-  ;(function interceptCartAdd() {
-    // Patch fetch
-    const originalFetch = window.fetch
-    window.fetch = async function (input, init) {
-      if (
-        typeof input === 'string' &&
-        input.includes('/cart/add.js') &&
-        init?.method === 'POST'
-      ) {
-        try {
-          let body = init.body
-          if (body && typeof body === 'string' && body.startsWith('{')) {
-            let payload = JSON.parse(body)
-
-            if (!payload.properties || !payload.properties.__si_exp) {
-              const newProps = buildSignalProperties(payload.id)
-              if (newProps) {
-                payload.properties = {
-                  ...(payload.properties || {}),
-                  __si_exp: JSON.stringify(newProps)
-                }
+  ;(function () {
+    // Override Fetch + XHR
+    // =========================
+    function interceptCartRequests() {
+      // ---- Fetch ----
+      const originalFetch = window.fetch
+      window.fetch = async function (input, init) {
+        if (
+          typeof input === 'string' &&
+          input.includes('/cart/add.js') &&
+          init?.method === 'POST'
+        ) {
+          try {
+            // JSON body
+            if (
+              init.body &&
+              typeof init.body === 'string' &&
+              init.body.startsWith('{')
+            ) {
+              let payload = JSON.parse(init.body)
+              if (!payload.properties || !payload.properties.__si_exp) {
+                const newProps = buildSignalProperties(payload.id)
+                if (newProps)
+                  payload.properties = {
+                    ...(payload.properties || {}),
+                    __si_exp: JSON.stringify(newProps)
+                  }
                 init.body = JSON.stringify(payload)
               }
             }
-          }
-        } catch (err) {
-          console.warn('Cart fetch interceptor error:', err)
-        }
-      }
-      return originalFetch(input, init)
-    }
-
-    // Patch XHR
-    const originalOpen = XMLHttpRequest.prototype.open
-    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-      this._isCartAdd =
-        method.toUpperCase() === 'POST' && url.includes('/cart/add.js')
-      return originalOpen.call(this, method, url, ...rest)
-    }
-
-    const originalSend = XMLHttpRequest.prototype.send
-    XMLHttpRequest.prototype.send = function (body) {
-      if (this._isCartAdd && body) {
-        try {
-          let payload = JSON.parse(body)
-          if (!payload.properties || !payload.properties.__si_exp) {
-            const newProps = buildSignalProperties(payload.id)
-            if (newProps) {
-              payload.properties = {
-                ...(payload.properties || {}),
-                __si_exp: JSON.stringify(newProps)
+            // FormData body (iOS support)
+            else if (init.body instanceof FormData) {
+              if (!init.body.has('properties[__si_exp]')) {
+                const variantId = init.body.get('id')
+                const newProps = buildSignalProperties(variantId)
+                if (newProps) {
+                  for (const key in newProps)
+                    init.body.append(`properties[${key}]`, newProps[key])
+                }
               }
-              body = JSON.stringify(payload)
             }
+          } catch (err) {
+            console.warn('Cart fetch interceptor error:', err)
           }
-        } catch (err) {
-          console.warn('Cart XHR interceptor error:', err)
         }
+        return originalFetch(input, init)
       }
-      return originalSend.call(this, body)
+
+      // ---- XHR ----
+      const originalOpen = XMLHttpRequest.prototype.open
+      XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+        this._isCartAdd =
+          method.toUpperCase() === 'POST' && url.includes('/cart/add.js')
+        return originalOpen.call(this, method, url, ...rest)
+      }
+
+      const originalSend = XMLHttpRequest.prototype.send
+      XMLHttpRequest.prototype.send = function (body) {
+        if (this._isCartAdd) {
+          try {
+            // JSON body
+            if (body && typeof body === 'string' && body.startsWith('{')) {
+              let payload = JSON.parse(body)
+              if (!payload.properties || !payload.properties.__si_exp) {
+                const newProps = buildSignalProperties(payload.id)
+                if (newProps)
+                  payload.properties = {
+                    ...(payload.properties || {}),
+                    __si_exp: JSON.stringify(newProps)
+                  }
+                body = JSON.stringify(payload)
+              }
+            }
+            // FormData body (iOS support)
+            else if (body instanceof FormData) {
+              if (!body.has('properties[__si_exp]')) {
+                const variantId = body.get('id')
+                const newProps = buildSignalProperties(variantId)
+                if (newProps) {
+                  for (const key in newProps)
+                    body.append(`properties[${key}]`, newProps[key])
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Cart XHR interceptor error:', err)
+          }
+        }
+        return originalSend.call(this, body)
+      }
+    }
+
+    // =========================
+    // Initialize interceptor after DOM ready
+    // =========================
+    if (
+      document.readyState === 'complete' ||
+      document.readyState === 'interactive'
+    ) {
+      interceptCartRequests()
+    } else {
+      document.addEventListener('DOMContentLoaded', interceptCartRequests)
     }
   })()
 
