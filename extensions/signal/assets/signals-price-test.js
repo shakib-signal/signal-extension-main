@@ -2040,7 +2040,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, resetTime)
       }
     } else {
-      consoleLog('Experiment ended')
       ignoreTest()
     }
 
@@ -3237,13 +3236,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const experiments = signal_rules
       clearTsSiKeys()
-      experiments.forEach(async (experiment) => {
-        if (experiment.schedule.method == 'time-based') {
-          switchTest(experiment, experiments)
-        } else {
-          await switchTestByUser(experiment, experiments)
-        }
-      })
+      if (experiments?.length > 0) {
+        experiments?.forEach(async (experiment) => {
+          if (experiment.schedule.method == 'time-based') {
+            switchTest(experiment, experiments)
+          } else {
+            await switchTestByUser(experiment, experiments)
+          }
+        })
+      } else {
+        localStorage.removeItem('signal_active_experiments')
+        activeExperiments = []
+        console.log('%cNo active experiment found. ', 'color: red;')
+      }
     } catch (e) {
       console.error(e)
     }
@@ -3664,105 +3669,166 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelectorAll('form[action*="/cart/add"]')
     .forEach(setupAddToCartButton)
 
-  // Watch for dynamically added forms
-  // Flag to prevent infinite loops when updating prices
-  // let isUpdatingPrices = false
+  // =============================
+  // Helper: Build Signal Properties
+  // =============================
+  function buildSignalProperties(variantId) {
+    try {
+      const experiments = JSON.parse(
+        localStorage.getItem('signal_active_experiments') || 'null'
+      )
+      const experimentPairs = []
 
-  // const observer = new MutationObserver((mutations) => {
-  //   // Skip if we're already updating prices to prevent loops
-  //   if (isUpdatingPrices) return
-
-  //   let shouldUpdatePrices = false
-
-  //   mutations.forEach((mutation) => {
-  //     // Skip if this mutation is from our price updates
-  //     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-  //       const hasPriceUpdates = Array.from(mutation.addedNodes).some(
-  //         (node) =>
-  //           node.nodeType === 1 && node.classList?.contains('js-option-price')
-  //       )
-  //       if (hasPriceUpdates) return
-  //     }
-
-  //     mutation.addedNodes.forEach((node) => {
-  //       if (node.nodeType === 1) {
-  //         // Check if the added node contains product cards or is a product card
-  //         const hasProductCards =
-  //           node.matches &&
-  //           (node.matches('a[href*="/products/"]') ||
-  //             (possibleSelectors.productCardContainer.length > 0 &&
-  //               possibleSelectors.productCardContainer.some((selector) =>
-  //                 node.matches(selector)
-  //               )))
-
-  //         if (hasProductCards) {
-  //           shouldUpdatePrices = true
-  //           console.log(
-  //             'Product cards detected in DOM changes, will update prices'
-  //           )
-  //         }
-
-  //         // Check if the added node is a form (for add to cart functionality)
-  //         if (node.matches && node.matches('form[action*="/cart/add"]')) {
-  //           setupAddToCartButton(node)
-  //         }
-  //         // Check for forms inside the added node
-  //         if (node.querySelectorAll) {
-  //           node
-  //             .querySelectorAll('form[action*="/cart/add"]')
-  //             .forEach(setupAddToCartButton)
-  //         }
-  //       }
-  //     })
-  //   })
-
-  //   // Only update prices if product cards were actually added
-  //   if (shouldUpdatePrices) {
-  //     console.log('Updating prices due to new product cards')
-  //     isUpdatingPrices = true
-
-  //     updateProductPricesOnCard()
-  //   }
-  //   setTimeout(() => {
-  //     revelAllHiddenPrices()
-  //     isUpdatingPrices = false
-  //   }, 600)
-  // })
-
-  // old
-
-  const observerX = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      // 1) New product cards added
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType !== 1) return // skip text etc.
-          // ✅ only run if it's a whole product card (adjust selector)
-
-          updateProductPricesOnCard() // pass the card
-          if (node.matches('form[action*="/cart/add"]')) {
-            setupAddToCartButton(node)
-          }
-          node
-            .querySelectorAll('form[action*="/cart/add"]')
-            .forEach(setupAddToCartButton)
-          // if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-          //   // setup add-to-cart on forms inside this card
-          // }
-          setTimeout(revelAllHiddenPrices, 1600)
-        })
+      // Theme Test
+      const themeExp = experiments?.experiments?.find((e) => e.theme)
+      if (themeExp?.theme?.experimentId && themeExp?.theme?.testId) {
+        experimentPairs.push(
+          `${themeExp.theme.experimentId}_${themeExp.theme.testId}`
+        )
       }
 
-      // 2) Existing card DOM changes (like price update)
-      // if (
-      //   mutation.type === 'characterData' ||
-      //   (mutation.type === 'attributes' &&
-      //     mutation.target.classList.contains('js-option-price'))
-      // ) {
-      //   return
-      // }
-    })
-  })
+      // Image Test
+      const imageTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'image_testing')
+        .find((p) => p.variantId == variantId)
+
+      if (imageTestExp) {
+        experimentPairs.push(
+          `${imageTestExp.experimentId}_${imageTestExp.testId}`
+        )
+      }
+
+      // Description Test
+      const descriptionTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'description_testing')
+        .find((p) => p.variantId == variantId)
+
+      if (descriptionTestExp) {
+        experimentPairs.push(
+          `${descriptionTestExp.experimentId}_${descriptionTestExp.testId}`
+        )
+      }
+
+      // Shipping Test
+      const shippingExp = experiments?.experiments?.find(
+        (e) => e.experimentType == 'shipping_testing'
+      )
+      if (
+        shippingExp?.shipping?.experimentId &&
+        shippingExp?.shipping?.testId
+      ) {
+        experimentPairs.push(
+          `${shippingExp.shipping.experimentId}_${shippingExp.shipping.testId}`
+        )
+      }
+
+      // Price Test
+      const priceTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'price_testing')
+        .find((p) => p.variantId == variantId)
+
+      let discountAmount = null
+      let price = null
+      if (priceTestExp) {
+        discountAmount = parseFloat(priceTestExp?.discountAmount).toFixed(2)
+        price = parseFloat(priceTestExp?.price).toFixed(2)
+        if (priceTestExp?.experimentId && priceTestExp?.testId) {
+          experimentPairs.push(
+            `${priceTestExp.experimentId}_${priceTestExp.testId}`
+          )
+        }
+      }
+
+      const userSession = JSON.parse(
+        localStorage.getItem('signal_user_session') || 'null'
+      )
+      const userId = userSession?.clientId
+
+      const experimentString = experimentPairs.join(',')
+
+      // Build final properties
+      const properties = {
+        __si_ud: userId,
+        __si_exp: experimentString
+      }
+
+      if (priceTestExp) {
+        properties['__si_p'] = price
+        properties['__si_d'] = discountAmount
+      }
+
+      return experimentString ? properties : null
+    } catch (err) {
+      console.warn('buildSignalProperties error:', err)
+      return null
+    }
+  }
+
+  // =============================
+  // Interceptor: fetch + XHR
+  // =============================
+  ;(function interceptCartAdd() {
+    // Patch fetch
+    const originalFetch = window.fetch
+    window.fetch = async function (input, init) {
+      if (
+        typeof input === 'string' &&
+        input.includes('/cart/add.js') &&
+        init?.method === 'POST'
+      ) {
+        try {
+          let body = init.body
+          if (body && typeof body === 'string' && body.startsWith('{')) {
+            let payload = JSON.parse(body)
+
+            if (!payload.properties || !payload.properties.__si_exp) {
+              const newProps = buildSignalProperties(payload.id)
+              if (newProps) {
+                payload.properties = {
+                  ...(payload.properties || {}),
+                  __si_exp: JSON.stringify(newProps)
+                }
+                init.body = JSON.stringify(payload)
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Cart fetch interceptor error:', err)
+        }
+      }
+      return originalFetch(input, init)
+    }
+
+    // Patch XHR
+    const originalOpen = XMLHttpRequest.prototype.open
+    XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+      this._isCartAdd =
+        method.toUpperCase() === 'POST' && url.includes('/cart/add.js')
+      return originalOpen.call(this, method, url, ...rest)
+    }
+
+    const originalSend = XMLHttpRequest.prototype.send
+    XMLHttpRequest.prototype.send = function (body) {
+      if (this._isCartAdd && body) {
+        try {
+          let payload = JSON.parse(body)
+          if (!payload.properties || !payload.properties.__si_exp) {
+            const newProps = buildSignalProperties(payload.id)
+            if (newProps) {
+              payload.properties = {
+                ...(payload.properties || {}),
+                __si_exp: JSON.stringify(newProps)
+              }
+              body = JSON.stringify(payload)
+            }
+          }
+        } catch (err) {
+          console.warn('Cart XHR interceptor error:', err)
+        }
+      }
+      return originalSend.call(this, body)
+    }
+  })()
 
   // Function to setup add-to-cart functionality for variant change elements
   function setupVariantChangeAddToCart(variantNode, variantId) {

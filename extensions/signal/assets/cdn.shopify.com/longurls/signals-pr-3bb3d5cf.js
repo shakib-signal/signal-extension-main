@@ -2040,6 +2040,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, resetTime)
       }
     } else {
+      consoleLog('Experiment ended')
       ignoreTest()
     }
 

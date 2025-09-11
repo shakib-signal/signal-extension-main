@@ -244,9 +244,14 @@ register(({ analytics, browser, init }) => {
       const deviceType = getDeviceType(context?.window?.screen?.width)
       const { experiments } = experimentData
       const experimentInfo = experiments
-        ?.map((exp) => `${exp.id}_${exp.testId}`)
+        ?.map((exp) => {
+          if (exp.id && exp.testId) {
+            return `${exp.id}_${exp.testId}`
+          }
+          return null
+        })
+        .filter((exp) => exp !== null)
         .join(',')
-      console.log(document, 'document')
       const metaData = {
         pageName:
           document?.location?.pathname == '/'
@@ -266,7 +271,9 @@ register(({ analytics, browser, init }) => {
         deviceType,
         shop
       }
-      sendEventToTracker(payload)
+      if (experimentInfo) {
+        sendEventToTracker(payload)
+      }
     } catch (error) {
       console.error('Error handling user session:', error)
     }
@@ -421,26 +428,26 @@ register(({ analytics, browser, init }) => {
     })
   })
 
-  analytics.subscribe('product_removed_from_cart', async (event) => {
-    const { clientId, timestamp, context, data } = event
-    const cartLine = data?.cartLine
-    const merch = cartLine?.merchandise
+  // analytics.subscribe('product_removed_from_cart', async (event) => {
+  //   const { clientId, timestamp, context, data } = event
+  //   const cartLine = data?.cartLine
+  //   const merch = cartLine?.merchandise
 
-    await buildAndSendEventPayload({
-      eventName: 'cart_abandoned',
-      clientId,
-      timestamp,
-      context,
-      variantId: merch?.id,
-      productId: merch?.product?.id,
-      productTitle: merch?.product?.title,
-      variantTitle: merch?.title,
-      quantity: cartLine?.quantity,
-      price: cartLine?.cost?.totalAmount?.amount,
-      currency: cartLine?.cost?.totalAmount?.currencyCode,
-      shop
-    })
-  })
+  //   await buildAndSendEventPayload({
+  //     eventName: 'cart_abandoned',
+  //     clientId,
+  //     timestamp,
+  //     context,
+  //     variantId: merch?.id,
+  //     productId: merch?.product?.id,
+  //     productTitle: merch?.product?.title,
+  //     variantTitle: merch?.title,
+  //     quantity: cartLine?.quantity,
+  //     price: cartLine?.cost?.totalAmount?.amount,
+  //     currency: cartLine?.cost?.totalAmount?.currencyCode,
+  //     shop
+  //   })
+  // })
 
   analytics.subscribe('checkout_started', async (event) => {
     const { data } = event
