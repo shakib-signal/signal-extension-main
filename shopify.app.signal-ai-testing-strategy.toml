@@ -1,9 +1,9 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "5a195fa302c263a070941a2f744170b6"
+name = "TestSignal A/B Price & Testing"
 application_url = "https://api.testsignal.com/app"
 embedded = false
-name = "TestSignal A/B Price & Testing"
 handle = "signal-5"
 
 [build]

@@ -7,6 +7,7 @@ let customSelectors = {}
 let sellingObj = {}
 let shippingExp = {}
 let currencySymbol = null
+let activeExperiments = []
 const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
@@ -1954,6 +1955,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       removeStorage(experiment.id, 'active_ts')
       removeStorage(experiment.id, 'last_ts_switch')
       removeStorage(experiment.id, 'next_ts_time')
+      activeExperiments = []
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
@@ -2021,7 +2023,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newProducts = applyTestPrices(experiment, activeTest)
       products.push(...newProducts)
       const activeExpData = experimentWithTest(experiment, activeTest)
-      storeExperimentData(experiments, products, utmParams)
+      activeExperiments.push(activeExpData)
+      storeExperimentData(activeExperiments, products, utmParams)
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
 
       // Schedule reset at experiment end
@@ -2043,6 +2046,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (!experimentFound) {
       localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.clear()
       console.log(
         '%cNo active experiment found. Resetting prices.',
@@ -2084,6 +2088,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newProducts = applyTestPrices(experiment, currentTest.id)
         const activeExpData = experimentWithTest(experiment, currentTest.id)
         products.push(...newProducts)
+        activeExperiments.push(activeExpData)
+        const utmParams = getUTMParams()
+        storeExperimentData(activeExperiments, products, utmParams)
         runTestBasedOnType(
           experiment?.experimentType,
           newProducts,
@@ -2164,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       removeStorage(experiment.id, 'active_ts')
       removeStorage(experiment.id, 'last_ts_switch')
       removeStorage(experiment.id, 'next_ts_time')
+      activeExperiments = []
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
@@ -2174,11 +2182,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
     if (experiment?.experimentType == 'theme_testing') {
-      storeExperimentData(experiments, products)
       const currentTest = experiment?.tests?.find(
         (test) => test?.testId == experiment?.theme?.testId
       )
-      console.log(currentTest, 'currentTest')
+      const activeExperiment = experimentWithTest(
+        experiment,
+        currentTest?.testId
+      )
+      const modifiyThemeExperiment = {
+        ...activeExperiment,
+        theme: {
+          ...experiment.theme
+        }
+      }
+      activeExperiments.push(modifiyThemeExperiment)
+      storeExperimentData(activeExperiments, products, activeExperiment)
       console.log(
         `%cCurrently Running(Theme Testing): ${
           currentTest?.name ? `(${currentTest?.name})` : ''
@@ -2201,9 +2219,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
         // Store active experiment data in local storage for web pixel
-
-        const utmParams = getUTMParams()
-        storeExperimentData(experiments, products, utmParams)
 
         const duration = (endDate - startDate) / (1000 * 60)
         const testIntervals = []
@@ -2233,6 +2248,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!experimentFound) {
       // Clear active experiment data when no experiments are running
       localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.clear()
       console.log(
         '%cNo active experiment found. Resetting prices.',

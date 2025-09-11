@@ -4,36 +4,16 @@ register(({ analytics, browser, init }) => {
   // Get shop information from init
   const shop = init?.data?.shop?.myshopifyDomain
 
-  // Initialize user session with Shopify's clientId
-  analytics.subscribe('page_viewed', async (event) => {
-    const { clientId } = event
-    try {
-      const storedSession = await browser.localStorage.getItem(
-        'signal_user_session'
-      )
-      let userSession = storedSession ? JSON.parse(storedSession) : null
-
-      if (!userSession) {
-        userSession = {
-          clientId,
-          firstVisit: new Date().toISOString(),
-          lastVisit: new Date().toISOString(),
-          visitCount: 1
-        }
-      } else {
-        // Update last visit and increment visit count
-        userSession.lastVisit = new Date().toISOString()
-        userSession.visitCount = (userSession.visitCount || 0) + 1
-      }
-
-      await browser.localStorage.setItem(
-        'signal_user_session',
-        JSON.stringify(userSession)
-      )
-    } catch (error) {
-      console.error('Error handling user session:', error)
-    }
-  })
+  const getActiveExperiments = async () => {
+    const activeExperiments = await browser.localStorage.getItem(
+      'signal_active_experiments'
+    )
+    const data =
+      typeof activeExperiments === 'string'
+        ? JSON.parse(activeExperiments)
+        : activeExperiments
+    return data
+  }
 
   // Function to get device type based on screen width
   function getDeviceType(width) {
@@ -78,7 +58,6 @@ register(({ analytics, browser, init }) => {
       const activeExperimentJSON = await browser.localStorage.getItem(
         'signal_active_experiments'
       )
-      console.log(activeExperimentJSON, 'activeExperimentJSON')
       if (!activeExperimentJSON) return null
 
       // If the value is stored as an object (some storage APIs auto-parse), handle that:
@@ -198,9 +177,7 @@ register(({ analytics, browser, init }) => {
       themeExperiment && themeExperiment !== 'undefined'
         ? themeExperiment?.experimentId
         : null
-    console.log(experimentId, 'experimentId')
     const experimentTypes = await getExperimentType(experimentId)
-    console.log(experimentTypes, 'experimentTypes')
     const isInExperiment = variantId
       ? await isProductInExperiment(variantId)
       : false
@@ -235,6 +212,66 @@ register(({ analytics, browser, init }) => {
     }
   }
 
+  // Initialize user session with Shopify's clientId
+  analytics.subscribe('page_viewed', async (event) => {
+    const { clientId, context, timestamp } = event
+    const { document } = context
+    try {
+      const storedSession = await browser.localStorage.getItem(
+        'signal_user_session'
+      )
+
+      let userSession = storedSession ? JSON.parse(storedSession) : null
+
+      if (!userSession) {
+        userSession = {
+          clientId,
+          firstVisit: new Date().toISOString(),
+          lastVisit: new Date().toISOString(),
+          visitCount: 1
+        }
+      } else {
+        // Update last visit and increment visit count
+        userSession.lastVisit = new Date().toISOString()
+        userSession.visitCount = (userSession.visitCount || 0) + 1
+      }
+
+      await browser.localStorage.setItem(
+        'signal_user_session',
+        JSON.stringify(userSession)
+      )
+      const experimentData = await getActiveExperiments()
+      const deviceType = getDeviceType(context?.window?.screen?.width)
+      const { experiments } = experimentData
+      const experimentInfo = experiments
+        ?.map((exp) => `${exp.id}_${exp.testId}`)
+        .join(',')
+      console.log(document, 'document')
+      const metaData = {
+        pageName:
+          document?.location?.pathname == '/'
+            ? 'home'
+            : document?.location?.pathname?.split('/')[1],
+        pageUrl: document?.location?.href,
+        pageReferrer: document?.referrer,
+        pageTitle: document?.title
+      }
+      const payload = {
+        eventName: 'page_viewed',
+        clientId,
+        timestamp,
+        experiment_info: experimentInfo,
+        metaData,
+        pageName: metaData.pageName,
+        deviceType,
+        shop
+      }
+      sendEventToTracker(payload)
+    } catch (error) {
+      console.error('Error handling user session:', error)
+    }
+  })
+
   // build product event payload
 
   async function buildAndSendEventPayload({
@@ -254,7 +291,6 @@ register(({ analytics, browser, init }) => {
     getVariantDetails
   }) {
     const { experimentInfo } = await getExperimentContext(variantId)
-    console.log('experimentInfo', experimentInfo)
     if (!experimentInfo) return
 
     const utmParams = await getUTMParams()
