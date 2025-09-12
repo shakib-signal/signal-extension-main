@@ -327,7 +327,7 @@ function waitForUserSession(callback, interval = 100, maxWait = 1500) {
   check()
 }
 
-function formatedPriceWithCurrency(cents) {
+function formatedPriceWithCurrencyX(cents) {
   try {
     if (typeof cents === 'string') {
       cents = cents.replace('.', '')
@@ -386,6 +386,73 @@ function formatedPriceWithCurrency(cents) {
       currency: currency,
       currencyDisplay: 'narrowSymbol'
     }).format(cents / 100)
+    currencySymbol = formattedAmount.match(/^[^\d]+/)[0]
+    return formattedAmount
+  }
+}
+function formatedPriceWithCurrency(cents) {
+  try {
+    if (typeof cents === 'string') {
+      cents = cents.replace('.', '')
+    }
+    cents = parseFloat(cents)
+    // :white_check_mark: get currency, locale, rate from window.Shopify
+    // const currency = window?.Shopify?.currency?.active || "USD";
+    const rate = parseFloat(window?.Shopify?.currency?.rate || 1)
+    // const locale = window?.Shopify?.locale || "en";
+    // apply conversion rate
+    const convertedCents = cents * rate
+    console.log('convertedCents', convertedCents)
+    let value = ''
+    const placeholderRegex = /\{\{\s*(\w+)\s*\}\}/
+    const formatString = signalMoneyFormat.replace(/<[^>]*>/g, '')
+    function defaultOption(opt, def) {
+      return typeof opt === 'undefined' ? def : opt
+    }
+    function formatWithDelimiters(number, precision, thousands, decimal) {
+      precision = defaultOption(precision, 2)
+      thousands = defaultOption(thousands, ',')
+      decimal = defaultOption(decimal, '.')
+      if (isNaN(number) || number == null) {
+        return 0
+      }
+      number = (number / 100.0).toFixed(precision)
+      const parts = number.split('.')
+      const dollars = parts[0].replace(
+        /(\d)(?=(\d\d\d)+(?!\d))/g,
+        '$1' + thousands
+      )
+      const cents = parts[1] ? decimal + parts[1] : ''
+      return dollars + cents
+    }
+    switch (formatString.match(placeholderRegex)[1]) {
+      case 'amount':
+        value = formatWithDelimiters(convertedCents, 2)
+        break
+      case 'amount_no_decimals':
+        value = formatWithDelimiters(convertedCents, 0)
+        break
+      case 'amount_with_comma_separator':
+        value = formatWithDelimiters(convertedCents, 2, '.', ',')
+        break
+      case 'amount_no_decimals_with_comma_separator':
+        value = formatWithDelimiters(convertedCents, 0, '.', ',')
+        break
+      default:
+        value = formatWithDelimiters(convertedCents, 2)
+        break
+    }
+    return formatString.replace(placeholderRegex, value)
+  } catch (error) {
+    // fallback using Intl API
+    const currency = window?.Shopify?.currency?.active || 'USD'
+    const locale = window?.Shopify?.locale || 'en'
+    const formattedAmount = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency,
+      currencyDisplay: 'narrowSymbol'
+    }).format(cents / 100)
+
     currencySymbol = formattedAmount.match(/^[^\d]+/)[0]
     return formattedAmount
   }
