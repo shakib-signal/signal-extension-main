@@ -2248,26 +2248,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
     if (experiment?.experimentType == 'theme_testing') {
-      const currentTest = experiment?.tests?.find(
-        (test) => test?.testId == experiment?.theme?.testId
-      )
-      const activeExperiment = experimentWithTest(
-        experiment,
-        currentTest?.testId
-      )
+      const theme = experiment?.theme
+
+      const activeExperiment = experimentWithTest(experiment, theme?.testId)
       const modifiyThemeExperiment = {
         ...activeExperiment,
-        theme: {
-          ...experiment.theme
-        }
+        theme
       }
       activeExperiments.push(modifiyThemeExperiment)
       storeExperimentData(activeExperiments, products, activeExperiment)
       console.log(
         `%cCurrently Running(Theme Testing): ${
-          currentTest?.name ? `(${currentTest?.name})` : ''
-        } of ${experiment.name}`,
+          theme?.themeName ? `(${theme?.themeName})` : ''
+        } of ${experiment?.name}`,
         'color: lightgreen; font-weight: bold;'
+      )
+      console.log(
+        `%cNext Test(Theme Testing): ${theme?.nextThemeName} of ${
+          experiment?.name
+        } (scheduled for ${new Date(theme?.nextSwitchAt).toLocaleString()})`,
+        'color: orange; font-weight: bold;'
       )
 
       return
