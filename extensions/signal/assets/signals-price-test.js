@@ -402,7 +402,6 @@ function formatedPriceWithCurrency(cents) {
     // const locale = window?.Shopify?.locale || "en";
     // apply conversion rate
     const convertedCents = cents * rate
-    console.log('convertedCents', convertedCents)
     let value = ''
     const placeholderRegex = /\{\{\s*(\w+)\s*\}\}/
     const formatString = signalMoneyFormat.replace(/<[^>]*>/g, '')
