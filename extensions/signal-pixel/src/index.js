@@ -67,7 +67,6 @@ register(({ analytics, browser, init }) => {
           : activeExperimentJSON
 
       const experiments = data.experiments || []
-      // console.log("experiment", experiments)
       const experiment = experiments.find((exp) => exp.id === experimentId)
       return experiment?.experimentType || null
     } catch (error) {
@@ -242,7 +241,7 @@ register(({ analytics, browser, init }) => {
       )
       const experimentData = await getActiveExperiments()
       const deviceType = getDeviceType(context?.window?.screen?.width)
-      const { experiments } = experimentData
+      const { experiments } = experimentData || {}
       const experimentInfo = experiments
         ?.map((exp) => {
           if (exp.id && exp.testId) {

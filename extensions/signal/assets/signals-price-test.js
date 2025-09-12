@@ -3317,6 +3317,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('%cNo active experiment found. ', 'color: red;')
       }
     } catch (e) {
+      localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.error(e)
     }
   })
