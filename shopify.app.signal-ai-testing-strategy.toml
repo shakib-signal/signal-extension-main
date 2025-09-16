@@ -7,7 +7,7 @@ embedded = false
 handle = "signal-5"
 
 [build]
-include_config_on_deploy = true
+include_config_on_deploy = false
 
 [webhooks]
 api_version = "2025-01"

@@ -244,7 +244,7 @@ register(({ analytics, browser, init }) => {
       const { experiments } = experimentData || {}
       const experimentInfo = experiments
         ?.map((exp) => {
-          if (exp.id && exp.testId) {
+          if (exp.id && exp.testId && exp.experimentType == 'theme_testing') {
             return `${exp.id}_${exp.testId}`
           }
           return null
