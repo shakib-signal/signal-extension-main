@@ -334,7 +334,11 @@ function formatedPriceWithCurrencyX(cents) {
     }
     let value = ''
     const placeholderRegex = /\{\{\s*(\w+)\s*\}\}/
-    const formatString = signalMoneyFormat.replace(/<[^>]*>/g, '')
+    const moneyFormat = shopCurrency?.moneyCurrencyFormat || null
+    const formatString = (moneyFormat || signalMoneyFormat).replace(
+      /<[^>]*>/g,
+      ''
+    )
 
     function defaultOption(opt, def) {
       return typeof opt === 'undefined' ? def : opt
