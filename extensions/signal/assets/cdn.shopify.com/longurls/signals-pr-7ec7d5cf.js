@@ -7,6 +7,7 @@ let customSelectors = {}
 let sellingObj = {}
 let shippingExp = {}
 let currencySymbol = null
+let activeExperiments = []
 const current_themeId = window.Shopify.theme.id.toString()
 const current_themeName = window.Shopify.theme.schema_name
 const current_shop = window.Shopify.shop
@@ -326,14 +327,18 @@ function waitForUserSession(callback, interval = 100, maxWait = 1500) {
   check()
 }
 
-function formatedPriceWithCurrency(cents) {
+function formatedPriceWithCurrencyX(cents) {
   try {
     if (typeof cents === 'string') {
       cents = cents.replace('.', '')
     }
     let value = ''
     const placeholderRegex = /\{\{\s*(\w+)\s*\}\}/
-    const formatString = signalMoneyFormat.replace(/<[^>]*>/g, '')
+    const moneyFormat = shopCurrency?.moneyCurrencyFormat || null
+    const formatString = (moneyFormat || signalMoneyFormat).replace(
+      /<[^>]*>/g,
+      ''
+    )
 
     function defaultOption(opt, def) {
       return typeof opt === 'undefined' ? def : opt
@@ -385,6 +390,76 @@ function formatedPriceWithCurrency(cents) {
       currency: currency,
       currencyDisplay: 'narrowSymbol'
     }).format(cents / 100)
+    currencySymbol = formattedAmount.match(/^[^\d]+/)[0]
+    return formattedAmount
+  }
+}
+function formatedPriceWithCurrency(cents) {
+  try {
+    if (typeof cents === 'string') {
+      cents = cents.replace('.', '')
+    }
+    cents = parseFloat(cents)
+    // :white_check_mark: get currency, locale, rate from window.Shopify
+    // const currency = window?.Shopify?.currency?.active || "USD";
+    const rate = parseFloat(window?.Shopify?.currency?.rate || 1)
+    // const locale = window?.Shopify?.locale || "en";
+    // apply conversion rate
+    const convertedCents = cents * rate
+    let value = ''
+    const placeholderRegex = /\{\{\s*(\w+)\s*\}\}/
+    const moneyFormat = shopCurrency?.moneyCurrencyFormat || null
+    const formatString = (moneyFormat || signalMoneyFormat).replace(
+      /<[^>]*>/g,
+      ''
+    )
+    function defaultOption(opt, def) {
+      return typeof opt === 'undefined' ? def : opt
+    }
+    function formatWithDelimiters(number, precision, thousands, decimal) {
+      precision = defaultOption(precision, 2)
+      thousands = defaultOption(thousands, ',')
+      decimal = defaultOption(decimal, '.')
+      if (isNaN(number) || number == null) {
+        return 0
+      }
+      number = (number / 100.0).toFixed(precision)
+      const parts = number.split('.')
+      const dollars = parts[0].replace(
+        /(\d)(?=(\d\d\d)+(?!\d))/g,
+        '$1' + thousands
+      )
+      const cents = parts[1] ? decimal + parts[1] : ''
+      return dollars + cents
+    }
+    switch (formatString.match(placeholderRegex)[1]) {
+      case 'amount':
+        value = formatWithDelimiters(convertedCents, 2)
+        break
+      case 'amount_no_decimals':
+        value = formatWithDelimiters(convertedCents, 0)
+        break
+      case 'amount_with_comma_separator':
+        value = formatWithDelimiters(convertedCents, 2, '.', ',')
+        break
+      case 'amount_no_decimals_with_comma_separator':
+        value = formatWithDelimiters(convertedCents, 0, '.', ',')
+        break
+      default:
+        value = formatWithDelimiters(convertedCents, 2)
+        break
+    }
+    return formatString.replace(placeholderRegex, value)
+  } catch (error) {
+    // fallback using Intl API
+    const currency = window?.Shopify?.currency?.active || 'USD'
+    const locale = window?.Shopify?.locale || 'en'
+    const formattedAmount = new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currency,
+      currencyDisplay: 'narrowSymbol'
+    }).format(cents / 100)
+
     currencySymbol = formattedAmount.match(/^[^\d]+/)[0]
     return formattedAmount
   }
@@ -1954,6 +2029,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       removeStorage(experiment.id, 'active_ts')
       removeStorage(experiment.id, 'last_ts_switch')
       removeStorage(experiment.id, 'next_ts_time')
+      activeExperiments = []
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
@@ -2021,7 +2097,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const newProducts = applyTestPrices(experiment, activeTest)
       products.push(...newProducts)
       const activeExpData = experimentWithTest(experiment, activeTest)
-      storeExperimentData(experiments, products, utmParams)
+      activeExperiments.push(activeExpData)
+      storeExperimentData(activeExperiments, products, utmParams)
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
 
       // Schedule reset at experiment end
@@ -2037,12 +2114,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, resetTime)
       }
     } else {
-      consoleLog('Experiment ended')
       ignoreTest()
     }
 
     if (!experimentFound) {
       localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.clear()
       console.log(
         '%cNo active experiment found. Resetting prices.',
@@ -2084,6 +2161,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newProducts = applyTestPrices(experiment, currentTest.id)
         const activeExpData = experimentWithTest(experiment, currentTest.id)
         products.push(...newProducts)
+        activeExperiments.push(activeExpData)
+        const utmParams = getUTMParams()
+        storeExperimentData(activeExperiments, products, utmParams)
         runTestBasedOnType(
           experiment?.experimentType,
           newProducts,
@@ -2164,6 +2244,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       removeStorage(experiment.id, 'active_ts')
       removeStorage(experiment.id, 'last_ts_switch')
       removeStorage(experiment.id, 'next_ts_time')
+      activeExperiments = []
 
       const newProducts = applyTestPrices(experiment, experiment?.controlGroup)
       products.push(...newProducts)
@@ -2174,16 +2255,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       runTestBasedOnType(experiment?.experimentType, newProducts, activeExpData)
     }
     if (experiment?.experimentType == 'theme_testing') {
-      storeExperimentData(experiments, products)
-      const currentTest = experiment?.tests?.find(
-        (test) => test?.testId == experiment?.theme?.testId
-      )
-      console.log(currentTest, 'currentTest')
+      const theme = experiment?.theme
+
+      const activeExperiment = experimentWithTest(experiment, theme?.testId)
+      const modifiyThemeExperiment = {
+        ...activeExperiment,
+        theme
+      }
+      activeExperiments.push(modifiyThemeExperiment)
+      storeExperimentData(activeExperiments, products, activeExperiment)
       console.log(
         `%cCurrently Running(Theme Testing): ${
-          currentTest?.name ? `(${currentTest?.name})` : ''
-        } of ${experiment.name}`,
+          theme?.themeName ? `(${theme?.themeName})` : ''
+        } of ${experiment?.name}`,
         'color: lightgreen; font-weight: bold;'
+      )
+      console.log(
+        `%cNext Test(Theme Testing): ${theme?.nextThemeName} of ${
+          experiment?.name
+        } (scheduled for ${new Date(theme?.nextSwitchAt).toLocaleString()})`,
+        'color: orange; font-weight: bold;'
       )
 
       return
@@ -2201,9 +2292,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (now >= startDate && now <= endDate && isUTMAllowed(experiment)) {
         // Store active experiment data in local storage for web pixel
-
-        const utmParams = getUTMParams()
-        storeExperimentData(experiments, products, utmParams)
 
         const duration = (endDate - startDate) / (1000 * 60)
         const testIntervals = []
@@ -2233,6 +2321,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!experimentFound) {
       // Clear active experiment data when no experiments are running
       localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.clear()
       console.log(
         '%cNo active experiment found. Resetting prices.',
@@ -3221,14 +3310,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const experiments = signal_rules
       clearTsSiKeys()
-      experiments.forEach(async (experiment) => {
-        if (experiment.schedule.method == 'time-based') {
-          switchTest(experiment, experiments)
-        } else {
-          await switchTestByUser(experiment, experiments)
-        }
-      })
+      if (experiments?.length > 0) {
+        experiments?.forEach(async (experiment) => {
+          if (experiment.schedule.method == 'time-based') {
+            switchTest(experiment, experiments)
+          } else {
+            await switchTestByUser(experiment, experiments)
+          }
+        })
+      } else {
+        localStorage.removeItem('signal_active_experiments')
+        activeExperiments = []
+        console.log('%cNo active experiment found. ', 'color: red;')
+      }
     } catch (e) {
+      localStorage.removeItem('signal_active_experiments')
+      activeExperiments = []
       console.error(e)
     }
   })
@@ -3648,105 +3745,208 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelectorAll('form[action*="/cart/add"]')
     .forEach(setupAddToCartButton)
 
-  // Watch for dynamically added forms
-  // Flag to prevent infinite loops when updating prices
-  // let isUpdatingPrices = false
+  // =============================
+  // Helper: Build Signal Properties
+  // =============================
+  function buildSignalProperties(variantId) {
+    try {
+      const experiments = JSON.parse(
+        localStorage.getItem('signal_active_experiments') || 'null'
+      )
+      const experimentPairs = []
 
-  // const observer = new MutationObserver((mutations) => {
-  //   // Skip if we're already updating prices to prevent loops
-  //   if (isUpdatingPrices) return
-
-  //   let shouldUpdatePrices = false
-
-  //   mutations.forEach((mutation) => {
-  //     // Skip if this mutation is from our price updates
-  //     if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-  //       const hasPriceUpdates = Array.from(mutation.addedNodes).some(
-  //         (node) =>
-  //           node.nodeType === 1 && node.classList?.contains('js-option-price')
-  //       )
-  //       if (hasPriceUpdates) return
-  //     }
-
-  //     mutation.addedNodes.forEach((node) => {
-  //       if (node.nodeType === 1) {
-  //         // Check if the added node contains product cards or is a product card
-  //         const hasProductCards =
-  //           node.matches &&
-  //           (node.matches('a[href*="/products/"]') ||
-  //             (possibleSelectors.productCardContainer.length > 0 &&
-  //               possibleSelectors.productCardContainer.some((selector) =>
-  //                 node.matches(selector)
-  //               )))
-
-  //         if (hasProductCards) {
-  //           shouldUpdatePrices = true
-  //           console.log(
-  //             'Product cards detected in DOM changes, will update prices'
-  //           )
-  //         }
-
-  //         // Check if the added node is a form (for add to cart functionality)
-  //         if (node.matches && node.matches('form[action*="/cart/add"]')) {
-  //           setupAddToCartButton(node)
-  //         }
-  //         // Check for forms inside the added node
-  //         if (node.querySelectorAll) {
-  //           node
-  //             .querySelectorAll('form[action*="/cart/add"]')
-  //             .forEach(setupAddToCartButton)
-  //         }
-  //       }
-  //     })
-  //   })
-
-  //   // Only update prices if product cards were actually added
-  //   if (shouldUpdatePrices) {
-  //     console.log('Updating prices due to new product cards')
-  //     isUpdatingPrices = true
-
-  //     updateProductPricesOnCard()
-  //   }
-  //   setTimeout(() => {
-  //     revelAllHiddenPrices()
-  //     isUpdatingPrices = false
-  //   }, 600)
-  // })
-
-  // old
-
-  const observerX = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      // 1) New product cards added
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType !== 1) return // skip text etc.
-          // ✅ only run if it's a whole product card (adjust selector)
-
-          updateProductPricesOnCard() // pass the card
-          if (node.matches('form[action*="/cart/add"]')) {
-            setupAddToCartButton(node)
-          }
-          node
-            .querySelectorAll('form[action*="/cart/add"]')
-            .forEach(setupAddToCartButton)
-          // if (node.matches(possibleSelectors.productCardContainer.join(','))) {
-          //   // setup add-to-cart on forms inside this card
-          // }
-          setTimeout(revelAllHiddenPrices, 1600)
-        })
+      // Theme Test
+      const themeExp = experiments?.experiments?.find((e) => e.theme)
+      if (themeExp?.theme?.experimentId && themeExp?.theme?.testId) {
+        experimentPairs.push(
+          `${themeExp.theme.experimentId}_${themeExp.theme.testId}`
+        )
       }
 
-      // 2) Existing card DOM changes (like price update)
-      // if (
-      //   mutation.type === 'characterData' ||
-      //   (mutation.type === 'attributes' &&
-      //     mutation.target.classList.contains('js-option-price'))
-      // ) {
-      //   return
-      // }
-    })
-  })
+      // Image Test
+      const imageTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'image_testing')
+        .find((p) => p.variantId == variantId)
+
+      if (imageTestExp) {
+        experimentPairs.push(
+          `${imageTestExp.experimentId}_${imageTestExp.testId}`
+        )
+      }
+
+      // Description Test
+      const descriptionTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'description_testing')
+        .find((p) => p.variantId == variantId)
+
+      if (descriptionTestExp) {
+        experimentPairs.push(
+          `${descriptionTestExp.experimentId}_${descriptionTestExp.testId}`
+        )
+      }
+
+      // Shipping Test
+      const shippingExp = experiments?.experiments?.find(
+        (e) => e.experimentType == 'shipping_testing'
+      )
+      if (
+        shippingExp?.shipping?.experimentId &&
+        shippingExp?.shipping?.testId
+      ) {
+        experimentPairs.push(
+          `${shippingExp.shipping.experimentId}_${shippingExp.shipping.testId}`
+        )
+      }
+
+      // Price Test
+      const priceTestExp = (window.products || [])
+        .filter((p) => p.experimentType === 'price_testing')
+        .find((p) => p.variantId == variantId)
+
+      let discountAmount = null
+      let price = null
+      if (priceTestExp) {
+        discountAmount = parseFloat(priceTestExp?.discountAmount).toFixed(2)
+        price = parseFloat(priceTestExp?.price).toFixed(2)
+        if (priceTestExp?.experimentId && priceTestExp?.testId) {
+          experimentPairs.push(
+            `${priceTestExp.experimentId}_${priceTestExp.testId}`
+          )
+        }
+      }
+
+      const userSession = JSON.parse(
+        localStorage.getItem('signal_user_session') || 'null'
+      )
+      const userId = userSession?.clientId
+
+      const experimentString = experimentPairs.join(',')
+
+      // Build final properties
+      const properties = {
+        __si_ud: userId,
+        __si_exp: experimentString
+      }
+
+      if (priceTestExp) {
+        properties['__si_p'] = price
+        properties['__si_d'] = discountAmount
+      }
+
+      return experimentString ? properties : null
+    } catch (err) {
+      console.warn('buildSignalProperties error:', err)
+      return null
+    }
+  }
+
+  // =============================
+  // Interceptor: fetch + XHR
+  // =============================
+  ;(function () {
+    // Override Fetch + XHR
+    // =========================
+    function interceptCartRequests() {
+      // ---- Fetch ----
+      const originalFetch = window.fetch
+      window.fetch = async function (input, init) {
+        if (
+          typeof input === 'string' &&
+          input.includes('/cart/add.js') &&
+          init?.method === 'POST'
+        ) {
+          try {
+            // JSON body
+            if (
+              init.body &&
+              typeof init.body === 'string' &&
+              init.body.startsWith('{')
+            ) {
+              let payload = JSON.parse(init.body)
+              if (!payload.properties || !payload.properties.__si_exp) {
+                const newProps = buildSignalProperties(payload.id)
+                if (newProps)
+                  payload.properties = {
+                    ...(payload.properties || {}),
+                    __si_exp: JSON.stringify(newProps)
+                  }
+                init.body = JSON.stringify(payload)
+              }
+            }
+            // FormData body (iOS support)
+            else if (init.body instanceof FormData) {
+              if (!init.body.has('properties[__si_exp]')) {
+                const variantId = init.body.get('id')
+                const newProps = buildSignalProperties(variantId)
+                if (newProps) {
+                  for (const key in newProps)
+                    init.body.append(`properties[${key}]`, newProps[key])
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Cart fetch interceptor error:', err)
+          }
+        }
+        return originalFetch(input, init)
+      }
+
+      // ---- XHR ----
+      const originalOpen = XMLHttpRequest.prototype.open
+      XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+        this._isCartAdd =
+          method.toUpperCase() === 'POST' && url.includes('/cart/add.js')
+        return originalOpen.call(this, method, url, ...rest)
+      }
+
+      const originalSend = XMLHttpRequest.prototype.send
+      XMLHttpRequest.prototype.send = function (body) {
+        if (this._isCartAdd) {
+          try {
+            // JSON body
+            if (body && typeof body === 'string' && body.startsWith('{')) {
+              let payload = JSON.parse(body)
+              if (!payload.properties || !payload.properties.__si_exp) {
+                const newProps = buildSignalProperties(payload.id)
+                if (newProps)
+                  payload.properties = {
+                    ...(payload.properties || {}),
+                    __si_exp: JSON.stringify(newProps)
+                  }
+                body = JSON.stringify(payload)
+              }
+            }
+            // FormData body (iOS support)
+            else if (body instanceof FormData) {
+              if (!body.has('properties[__si_exp]')) {
+                const variantId = body.get('id')
+                const newProps = buildSignalProperties(variantId)
+                if (newProps) {
+                  for (const key in newProps)
+                    body.append(`properties[${key}]`, newProps[key])
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Cart XHR interceptor error:', err)
+          }
+        }
+        return originalSend.call(this, body)
+      }
+    }
+
+    // =========================
+    // Initialize interceptor after DOM ready
+    // =========================
+    if (
+      document.readyState === 'complete' ||
+      document.readyState === 'interactive'
+    ) {
+      interceptCartRequests()
+    } else {
+      document.addEventListener('DOMContentLoaded', interceptCartRequests)
+    }
+  })()
 
   // Function to setup add-to-cart functionality for variant change elements
   function setupVariantChangeAddToCart(variantNode, variantId) {
