@@ -3312,10 +3312,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearTsSiKeys()
       if (experiments?.length > 0) {
         experiments?.forEach(async (experiment) => {
-          if (experiment.schedule.method == 'time-based') {
-            switchTest(experiment, experiments)
+          if (experiment.status == 'active') {
+            if (experiment.schedule.method == 'time-based') {
+              switchTest(experiment, experiments)
+            } else {
+              await switchTestByUser(experiment, experiments)
+            }
           } else {
-            await switchTestByUser(experiment, experiments)
+            console.log(
+              '%cExperiment is not active. Skipping...',
+              'color: red;'
+            )
+            localStorage.removeItem('signal_active_experiments')
+            activeExperiments = []
           }
         })
       } else {
